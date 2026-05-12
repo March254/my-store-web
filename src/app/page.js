@@ -7,8 +7,8 @@ import ItemCard from './ItemCard';
 export default function Home() {
   const [user, setUser] = useState(null);
   const [products, setProducts] = useState([]);
-  const [categories, setCategories] = useState([]); // เก็บรายชื่อหมวดหมู่ทั้งหมด
-  const [activeCategory, setActiveCategory] = useState("All"); // หมวดหมู่ที่เลือกอยู่
+  const [categories, setCategories] = useState([]);
+  const [activeCategory, setActiveCategory] = useState("All");
   const [borrower, setBorrower] = useState("");
   const [cart, setCart] = useState({});
   const [mode, setMode] = useState("withdraw");
@@ -35,7 +35,6 @@ export default function Home() {
     const { data } = await supabase.from('products').select('*').order('name');
     if (data) {
       setProducts(data);
-      // ดึงหมวดหมู่ที่ไม่ซ้ำกันออกมาทำปุ่ม Tab
       const uniqueCats = ["All", ...new Set(data.map(item => item.category).filter(Boolean))];
       setCategories(uniqueCats);
     }
@@ -47,9 +46,29 @@ export default function Home() {
     router.push('/login');
   };
 
+  // --- ส่วนที่แก้ไข: เพิ่มการเช็คเงื่อนไขจำนวน ---
   const updateCart = (itemId, amount) => {
+    const item = products.find(p => p.id == itemId);
+    const currentQtyInCart = cart[itemId] || 0;
+    const newQty = currentQtyInCart + amount;
+
+    if (mode === "withdraw") {
+      // โหมดเบิก: ห้ามเบิกเกินจำนวนที่มีอยู่ในสต็อกปัจจุบัน
+      if (newQty > item.stock) {
+        alert(`ไม่สามารถเบิกเกินจำนวนที่มีอยู่ได้ (คงเหลือ: ${item.stock})`);
+        return;
+      }
+    } else {
+      // โหมดคืน: ห้ามคืนจนยอดรวมในสต็อกเกินจำนวนที่กำหนดไว้สูงสุด (สมมติใช้ฟิลด์ max_stock ใน DB)
+      // หากไม่มีฟิลด์ max_stock ให้กำหนดค่าคงที่ เช่น 50 ตามที่คุณแจ้ง
+      const maxLimit = item.max_stock || 50; 
+      if (item.stock + newQty > maxLimit) {
+        alert(`ไม่สามารถคืนเกินจำนวนที่กำหนดได้ (สต็อกสูงสุดคือ: ${maxLimit}, ปัจจุบันมี: ${item.stock})`);
+        return;
+      }
+    }
+
     setCart(prev => {
-      const newQty = (prev[itemId] || 0) + amount;
       if (newQty <= 0) {
         const { [itemId]: _, ...rest } = prev;
         return rest;
@@ -66,6 +85,13 @@ export default function Home() {
       for (const [itemId, qty] of Object.entries(cart)) {
         const item = products.find(p => p.id == itemId);
         const newStock = mode === "withdraw" ? item.stock - qty : item.stock + qty;
+
+        // เช็คซ้ำอีกรอบก่อนบันทึกลง Database เพื่อความชัวร์
+        const maxLimit = item.max_stock || 50;
+        if (mode === "return" && newStock > maxLimit) {
+            throw new Error(`อุปกรณ์ ${item.name} มียอดเกินกำหนดไม่สามารถบันทึกได้`);
+        }
+
         await supabase.from('products').update({ stock: newStock }).eq('id', itemId);
         await supabase.from('transaction_logs').insert([{ 
           product_id: itemId, product_name: item.name, amount: qty, 
@@ -76,11 +102,10 @@ export default function Home() {
       setCart({});
       fetchProducts();
     } catch (error) {
-      alert("เกิดข้อผิดพลาดในการบันทึก");
+      alert(error.message || "เกิดข้อผิดพลาดในการบันทึก");
     }
   };
 
-  // Logic การกรองข้อมูลตามหมวดหมู่และช่องค้นหา
   const filteredProducts = products.filter(item => {
     const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = activeCategory === "All" || item.category === activeCategory;
@@ -124,25 +149,17 @@ export default function Home() {
             <button onClick={() => {setMode("return"); setCart({});}} className={`flex-1 py-4 rounded-xl font-black transition-all ${mode === 'return' ? 'bg-green-600 text-white shadow-lg shadow-green-100' : 'text-slate-400 hover:bg-slate-50'}`}>คืนอุปกรณ์</button>
           </div>
 
-          {/* ช่องค้นหา */}
+          {/* ค้นหาและหมวดหมู่ */}
           <div className="relative mb-6">
             <input type="text" placeholder="ค้นหาอุปกรณ์..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full p-5 pl-12 bg-white border border-slate-200 rounded-3xl shadow-sm outline-none focus:ring-4 focus:ring-blue-50/50 transition-all text-lg font-medium" />
             <span className="absolute left-5 top-1/2 -translate-y-1/2 text-xl">🔍</span>
           </div>
 
-          {/* --- แท็บหมวดหมู่ (Category Tabs) --- */}
           <div className="flex gap-2 overflow-x-auto pb-4 mb-6 no-scrollbar">
             {categories.map((cat) => (
-              <button
-                key={cat}
-                onClick={() => setActiveCategory(cat)}
-                className={`px-6 py-2 rounded-full whitespace-nowrap font-bold text-sm transition-all border ${
-                  activeCategory === cat 
-                  ? 'bg-slate-900 text-white border-slate-900 shadow-md scale-105' 
-                  : 'bg-white text-slate-500 border-slate-200 hover:border-blue-400'
-                }`}
-              >
+              <button key={cat} onClick={() => setActiveCategory(cat)}
+                className={`px-6 py-2 rounded-full whitespace-nowrap font-bold text-sm transition-all border ${activeCategory === cat ? 'bg-slate-900 text-white border-slate-900 shadow-md scale-105' : 'bg-white text-slate-500 border-slate-200'}`}>
                 {cat === 'All' ? 'หน้ารวมอุปกรณ์' : cat}
               </button>
             ))}
@@ -157,13 +174,13 @@ export default function Home() {
                 <ItemCard key={item.id} item={item} quantityInCart={cart[item.id] || 0} onUpdate={updateCart} mode={mode} />
               ))
             ) : (
-              <div className="text-center py-20 bg-white rounded-3xl border border-dashed text-slate-400 font-bold">ไม่พบอุปกรณ์ในหมวดหมู่นี้</div>
+              <div className="text-center py-20 bg-white rounded-3xl border border-dashed text-slate-400 font-bold">ไม่พบอุปกรณ์</div>
             )}
           </div>
         </div>
       </div>
 
-      {/* Cart Sidebar (ฝั่งขวา) */}
+      {/* Cart Sidebar */}
       <div className="w-full lg:w-96 bg-white border-l border-slate-100 p-8 flex flex-col shadow-2xl lg:shadow-none sticky lg:top-0 h-fit lg:h-screen">
         <h2 className="text-2xl font-black mb-8 flex items-center gap-3">
           <span className="p-2 bg-slate-100 rounded-xl">📦</span> รายการ{mode === 'withdraw' ? 'เบิก' : 'คืน'}
@@ -194,7 +211,7 @@ export default function Home() {
             <p className="font-bold text-blue-700">{user.email}</p>
           </div>
           <button onClick={handleConfirmAction} disabled={Object.keys(cart).length === 0}
-            className={`w-full py-5 rounded-[2rem] font-black text-white text-xl shadow-2xl transition-all active:scale-95 disabled:opacity-20 ${mode === 'withdraw' ? 'bg-blue-600' : 'bg-green-600'}`}>
+            className={`w-full py-5 rounded-[2rem] font-black text-white text-xl shadow-2xl transition-all active:scale-95 disabled:opacity-20 ${mode === 'withdraw' ? 'bg-blue-600 shadow-blue-100' : 'bg-green-600 shadow-green-100'}`}>
             ยืนยันทำรายการ
           </button>
         </div>
