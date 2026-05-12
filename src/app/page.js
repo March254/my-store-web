@@ -19,6 +19,7 @@ export default function Home() {
   const [myItems, setMyItems] = useState([]);
   const router = useRouter();
 
+  // --- 1. กำหนด Email แอดมินตรงนี้ (เปลี่ยนเป็นเมลของคุณ) ---
   const ADMIN_EMAILS = ["admin@email.com", "your-email@email.com"]; 
 
   useEffect(() => {
@@ -89,7 +90,7 @@ export default function Home() {
     const stockNum = parseInt(newStock);
     if (isNaN(stockNum) || stockNum < 0) return alert("กรุณาระบุจำนวนที่ถูกต้อง");
     const { error } = await supabase.from('products').update({ stock: stockNum }).eq('id', id);
-    if (!error) { fetchProducts(); alert("อัปเดตสต็อกแล้ว"); }
+    if (!error) { fetchProducts(); alert("อัปเดตสต็อกเรียบร้อยแล้ว"); }
   };
 
   const handleDecideGroup = async (groupId, decision) => {
@@ -124,7 +125,7 @@ export default function Home() {
         return;
       }
     } else {
-      // --- ปรับปรุงใหม่: เช็คว่าคืนเกินที่เบิกไปไหม ---
+      // --- เช็คจำนวนที่ถือครองอยู่จริง ---
       const borrowedItem = myItems.find(i => i.name === item.name);
       const currentlyHolding = borrowedItem ? borrowedItem.qty : 0;
 
@@ -133,7 +134,7 @@ export default function Home() {
         return;
       }
       
-      // เช็คเพดานสต็อกรวมด้วย (เผื่อแอดมินลดจำนวนของลง)
+      // ป้องกันการล็อกเพดาน 50
       const maxLimit = Math.max(item.stock, 100); 
       if (item.stock + newQty > maxLimit) {
         alert(`สต็อกรวมจะเกินกำหนด`);
@@ -162,7 +163,7 @@ export default function Home() {
         };
       });
       await supabase.from('borrow_requests').insert(inserts);
-      alert("ส่งคำขอสำเร็จ");
+      alert("ส่งคำขอสำเร็จ! รอแอดมินอนุมัติ");
       setCart({});
     } catch (error) { alert("Error"); }
   };
@@ -176,22 +177,33 @@ export default function Home() {
     <main className="min-h-screen bg-[#F8FAFC] flex flex-col lg:flex-row font-sans text-slate-900">
       <div className="flex-1 p-4 lg:p-10">
         <div className="max-w-3xl mx-auto">
-          {/* Header */}
+          {/* Header ที่แก้ไขโลโก้แล้ว */}
           <div className="flex justify-between items-center mb-8 bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-black text-xl">M</div>
+              <div className="relative w-14 h-14">
+                <img 
+                  src="/logo.png" 
+                  alt="Logo" 
+                  className="w-full h-full object-contain rounded-2xl" 
+                  onError={(e) => { 
+                    e.target.style.display = 'none'; 
+                    e.target.nextSibling.style.display = 'flex'; 
+                  }} 
+                />
+                <div className="hidden absolute inset-0 bg-blue-600 rounded-2xl items-center justify-center text-white font-black text-xl shadow-lg">M</div>
+              </div>
               <div>
                 <h1 className="text-xl font-black tracking-tighter uppercase">Maker<span className="text-blue-600">Stock</span></h1>
                 <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">{isAdmin ? 'Admin' : 'User'}</p>
               </div>
             </div>
-            <button onClick={handleLogout} className="bg-slate-900 text-white px-5 py-2.5 rounded-xl text-xs font-black">LOGOUT</button>
+            <button onClick={handleLogout} className="bg-slate-900 text-white px-5 py-2.5 rounded-xl text-xs font-black shadow-md">LOGOUT</button>
           </div>
 
-          {/* ประวัติการถือครอง (User) */}
+          {/* อุปกรณ์ที่ถือครอง */}
           {!isAdmin && myItems.length > 0 && (
             <div className="mb-10 bg-slate-900 p-8 rounded-[2.5rem] shadow-xl text-white">
-              <h2 className="text-lg font-black mb-4">📦 อุปกรณ์ที่คุณถือครองอยู่</h2>
+              <h2 className="text-lg font-black mb-4 flex items-center gap-2">📦 อุปกรณ์ที่คุณถือครองอยู่</h2>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 {myItems.map((item, idx) => (
                   <div key={idx} className="bg-white/10 p-4 rounded-2xl border border-white/10">
@@ -204,18 +216,18 @@ export default function Home() {
             </div>
           )}
 
-          {/* Admin Requests */}
+          {/* คำขอสำหรับ Admin */}
           {isAdmin && Object.keys(groupedRequests).length > 0 && (
             <div className="mb-10 space-y-6">
               {Object.entries(groupedRequests).map(([groupId, items]) => (
                 <div key={groupId} className="bg-white border-l-8 border-l-blue-600 p-8 rounded-[2.5rem] shadow-xl border border-slate-100">
                   <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                     <div>
-                      <h3 className="font-black text-slate-800 text-lg uppercase">ใบเบิก/คืน #{groupId.slice(-5)}</h3>
+                      <h3 className="font-black text-slate-800 text-lg uppercase tracking-tighter">ใบเบิก/คืน #{groupId.slice(-5)}</h3>
                       <p className="text-xs font-bold text-slate-400">โดย: {items[0].borrower_name}</p>
                     </div>
                     <div className="flex gap-2">
-                      <button onClick={() => handleDecideGroup(groupId, 'approved')} className="bg-blue-600 text-white px-8 py-3 rounded-xl text-xs font-black">อนุมัติ</button>
+                      <button onClick={() => handleDecideGroup(groupId, 'approved')} className="bg-blue-600 text-white px-8 py-3 rounded-xl text-xs font-black shadow-lg transition-all active:scale-95">อนุมัติ</button>
                       <button onClick={() => handleDecideGroup(groupId, 'rejected')} className="bg-white text-red-500 border border-red-50 px-8 py-3 rounded-xl text-xs font-black">ปฏิเสธ</button>
                     </div>
                   </div>
@@ -234,13 +246,13 @@ export default function Home() {
 
           {/* Search & Modes */}
           <div className="relative mb-6">
-            <input type="text" placeholder="ค้นหาอุปกรณ์..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full p-5 pl-14 bg-white border border-slate-200 rounded-3xl shadow-sm outline-none font-bold" />
+            <input type="text" placeholder="ค้นหาอุปกรณ์..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full p-5 pl-14 bg-white border border-slate-200 rounded-3xl shadow-sm outline-none font-bold focus:ring-4 focus:ring-blue-50" />
             <span className="absolute left-6 top-1/2 -translate-y-1/2 opacity-30 text-xl">🔍</span>
           </div>
 
           <div className="flex bg-white p-1.5 rounded-2xl border border-slate-200 mb-8 shadow-sm">
-            <button onClick={() => {setMode("withdraw"); setCart({});}} className={`flex-1 py-4 rounded-xl font-black text-sm transition-all ${mode === 'withdraw' ? 'bg-slate-900 text-white' : 'text-slate-400'}`}>เบิกของ</button>
-            <button onClick={() => {setMode("return"); setCart({});}} className={`flex-1 py-4 rounded-xl font-black text-sm transition-all ${mode === 'return' ? 'bg-blue-600 text-white' : 'text-slate-400'}`}>คืนของ</button>
+            <button onClick={() => {setMode("withdraw"); setCart({});}} className={`flex-1 py-4 rounded-xl font-black text-sm transition-all ${mode === 'withdraw' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400'}`}>เบิกของ</button>
+            <button onClick={() => {setMode("return"); setCart({});}} className={`flex-1 py-4 rounded-xl font-black text-sm transition-all ${mode === 'return' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400'}`}>คืนของ</button>
           </div>
 
           <div className="grid grid-cols-1 gap-4">
@@ -251,7 +263,7 @@ export default function Home() {
                   <button onClick={() => {
                     const n = prompt(`แก้ไขสต็อก: ${item.name}`, item.stock);
                     if (n !== null) handleAdminUpdateStock(item.id, n);
-                  }} className="absolute top-4 right-4 z-20 bg-white/90 text-[9px] font-black px-3 py-1.5 rounded-xl border border-slate-200 opacity-0 group-hover:opacity-100 transition-opacity">SET STOCK</button>
+                  }} className="absolute top-4 right-4 z-20 bg-white/90 text-[9px] font-black px-3 py-1.5 rounded-xl border border-slate-200 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm">SET STOCK</button>
                 )}
               </div>
             ))}
@@ -276,7 +288,7 @@ export default function Home() {
             );
           })}
         </div>
-        <button onClick={handleConfirmAction} disabled={Object.keys(cart).length === 0} className={`w-full py-5 rounded-[2rem] font-black text-white text-lg mt-8 ${mode === 'withdraw' ? 'bg-slate-900' : 'bg-blue-600'}`}>ยืนยันส่งคำขอ</button>
+        <button onClick={handleConfirmAction} disabled={Object.keys(cart).length === 0} className={`w-full py-5 rounded-[2rem] font-black text-white text-lg mt-8 shadow-2xl transition-all active:scale-95 ${mode === 'withdraw' ? 'bg-slate-900' : 'bg-blue-600'}`}>ยืนยันส่งคำขอ</button>
       </div>
     </main>
   );
