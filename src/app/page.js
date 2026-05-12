@@ -91,7 +91,7 @@ export default function Home() {
     if (isNaN(stockNum) || stockNum < 0) return alert("กรุณาระบุจำนวนที่ถูกต้อง");
     const { error } = await supabase.from('products').update({ stock: stockNum }).eq('id', id);
     if (!error) {
-      alert("อัปเดตสต็อกเรียบร้อยแล้ว (เพดานการคืนจะปรับตามอัตโนมัติ)");
+      alert("อัปเดตสต็อกเรียบร้อย (เพดานการคืนจะปรับตามค่านี้นะครับ)");
       fetchProducts();
     }
   };
@@ -111,11 +111,11 @@ export default function Home() {
         }
         await supabase.from('borrow_requests').update({ status: decision }).eq('id', req.id);
       }
-      alert(decision === 'approved' ? "✅ อนุมัติแล้ว" : "❌ ปฏิเสธแล้ว");
+      alert(decision === 'approved' ? "✅ อนุมัติคำขอทั้งหมดแล้ว" : "❌ ปฏิเสธคำขอแล้ว");
       fetchRequests();
       fetchProducts();
       if (user) fetchMyBorrowedItems(user.email);
-    } catch (error) { alert("Error process request"); }
+    } catch (error) { alert("เกิดข้อผิดพลาด"); }
   };
 
   const updateCart = (itemId, amount) => {
@@ -129,7 +129,7 @@ export default function Home() {
         return;
       }
     } else {
-      // --- จุดแก้ไขสำคัญ: ปรับเพดานตามสต็อกจริง ---
+      // แก้ไข: ใช้ค่าที่มากที่สุดระหว่าง Stock ปัจจุบัน หรือ 50 เพื่อป้องกันการล็อกเพดาน
       const maxLimit = Math.max(item.stock, 50); 
       if (item.stock + newQty > maxLimit) {
         alert(`คืนไม่ได้! จำนวนรวมจะเกินสต็อกสูงสุดที่ตั้งไว้ (${maxLimit})`);
@@ -147,7 +147,7 @@ export default function Home() {
   };
 
   const handleConfirmAction = async () => {
-    if (!borrower || Object.keys(cart).length === 0) return alert("กรุณาเลือกของ!");
+    if (!borrower || Object.keys(cart).length === 0) return alert("กรุณาเลือกของก่อน!");
     const groupId = `GRP-${Date.now()}`;
     try {
       const inserts = Object.entries(cart).map(([itemId, qty]) => {
@@ -158,7 +158,7 @@ export default function Home() {
         };
       });
       await supabase.from('borrow_requests').insert(inserts);
-      alert("ส่งคำขอสำเร็จ!");
+      alert("ส่งคำขอสำเร็จ! รอแอดมินอนุมัติ");
       setCart({});
     } catch (error) { alert("ส่งไม่สำเร็จ"); }
   };
@@ -184,13 +184,13 @@ export default function Home() {
                 <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">{isAdmin ? 'Admin Management' : 'User Inventory'}</p>
               </div>
             </div>
-            <button onClick={handleLogout} className="bg-slate-900 text-white px-5 py-2.5 rounded-xl text-xs font-black">LOGOUT</button>
+            <button onClick={handleLogout} className="bg-slate-900 text-white px-5 py-2.5 rounded-xl text-xs font-black shadow-md">LOGOUT</button>
           </div>
 
-          {/* อุปกรณ์ที่ถือครอง (User) */}
+          {/* อุปกรณ์ที่ถือครอง (แสดงเฉพาะ User) */}
           {!isAdmin && myItems.length > 0 && (
             <div className="mb-10 bg-slate-900 p-8 rounded-[2.5rem] shadow-xl text-white">
-              <h2 className="text-lg font-black mb-4">📦 อุปกรณ์ที่คุณถือครองอยู่</h2>
+              <h2 className="text-lg font-black mb-4 flex items-center gap-2">📦 อุปกรณ์ที่คุณถือครองอยู่</h2>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 {myItems.map((item, idx) => (
                   <div key={idx} className="bg-white/10 p-4 rounded-2xl border border-white/10">
@@ -203,9 +203,10 @@ export default function Home() {
             </div>
           )}
 
-          {/* คำขอสำหรับ Admin */}
+          {/* คำขอสำหรับ Admin (รวมกลุ่ม) */}
           {isAdmin && Object.keys(groupedRequests).length > 0 && (
             <div className="mb-10 space-y-6">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">คำขอรอดำเนินการ</p>
               {Object.entries(groupedRequests).map(([groupId, items]) => (
                 <div key={groupId} className="bg-white border-l-8 border-l-blue-600 p-8 rounded-[2.5rem] shadow-xl border border-slate-100">
                   <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
@@ -214,7 +215,7 @@ export default function Home() {
                       <p className="text-xs font-bold text-slate-400">โดย: {items[0].borrower_name}</p>
                     </div>
                     <div className="flex gap-2">
-                      <button onClick={() => handleDecideGroup(groupId, 'approved')} className="bg-blue-600 text-white px-8 py-3 rounded-xl text-xs font-black">อนุมัติทั้งหมด</button>
+                      <button onClick={() => handleDecideGroup(groupId, 'approved')} className="bg-blue-600 text-white px-8 py-3 rounded-xl text-xs font-black shadow-lg">อนุมัติทั้งหมด</button>
                       <button onClick={() => handleDecideGroup(groupId, 'rejected')} className="bg-white text-red-500 border border-red-50 px-8 py-3 rounded-xl text-xs font-black">ปฏิเสธ</button>
                     </div>
                   </div>
@@ -233,14 +234,16 @@ export default function Home() {
 
           {/* Search & Modes */}
           <div className="relative mb-6">
-            <input type="text" placeholder="ค้นหาอุปกรณ์..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full p-5 pl-14 bg-white border border-slate-200 rounded-3xl shadow-sm outline-none font-bold" />
+            <input type="text" placeholder="ค้นหาอุปกรณ์..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full p-5 pl-14 bg-white border border-slate-200 rounded-3xl shadow-sm outline-none font-bold focus:ring-4 focus:ring-blue-50 transition-all" />
             <span className="absolute left-6 top-1/2 -translate-y-1/2 opacity-30 text-xl">🔍</span>
           </div>
+
           <div className="flex bg-white p-1.5 rounded-2xl border border-slate-200 mb-8 shadow-sm">
             <button onClick={() => {setMode("withdraw"); setCart({});}} className={`flex-1 py-4 rounded-xl font-black text-sm transition-all ${mode === 'withdraw' ? 'bg-slate-900 text-white' : 'text-slate-400'}`}>เบิกของ</button>
             <button onClick={() => {setMode("return"); setCart({});}} className={`flex-1 py-4 rounded-xl font-black text-sm transition-all ${mode === 'return' ? 'bg-blue-600 text-white' : 'text-slate-400'}`}>คืนของ</button>
           </div>
 
+          {/* รายการสินค้า */}
           <div className="grid grid-cols-1 gap-4">
             {loading ? <div className="text-center py-20 animate-spin">🌀</div> : filteredProducts.map((item) => (
               <div key={item.id} className="group relative">
@@ -249,7 +252,7 @@ export default function Home() {
                   <button onClick={() => {
                     const n = prompt(`แก้ไขสต็อก: ${item.name}`, item.stock);
                     if (n !== null) handleAdminUpdateStock(item.id, n);
-                  }} className="absolute top-4 right-4 z-20 bg-white/90 text-[9px] font-black px-3 py-1.5 rounded-xl border border-slate-200 opacity-0 group-hover:opacity-100 transition-opacity">SET STOCK</button>
+                  }} className="absolute top-4 right-4 z-20 bg-white/90 text-[9px] font-black px-3 py-1.5 rounded-xl border border-slate-200 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm">SET STOCK</button>
                 )}
               </div>
             ))}
@@ -257,7 +260,7 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Sidebar ตะกร้า */}
+      {/* Cart Sidebar */}
       <div className="w-full lg:w-96 bg-white border-l p-8 flex flex-col shadow-2xl sticky lg:top-0 h-fit lg:h-screen">
         <h2 className="text-2xl font-black text-slate-800 mb-8 flex items-center gap-3">🛒 ตะกร้าของ{mode === 'withdraw' ? 'เบิก' : 'คืน'}</h2>
         <div className="flex-1 overflow-y-auto space-y-4">
@@ -274,7 +277,7 @@ export default function Home() {
             );
           })}
         </div>
-        <button onClick={handleConfirmAction} disabled={Object.keys(cart).length === 0} className={`w-full py-5 rounded-[2rem] font-black text-white text-lg mt-8 ${mode === 'withdraw' ? 'bg-slate-900' : 'bg-blue-600'}`}>ยืนยันส่งคำขอ</button>
+        <button onClick={handleConfirmAction} disabled={Object.keys(cart).length === 0} className={`w-full py-5 rounded-[2rem] font-black text-white text-lg mt-8 shadow-2xl transition-all active:scale-95 ${mode === 'withdraw' ? 'bg-slate-900' : 'bg-blue-600'}`}>ยืนยันส่งคำขอ</button>
       </div>
     </main>
   );
