@@ -188,7 +188,7 @@ export default function Home() {
           
           {Object.keys(cart).length > 0 && (
             <button onClick={() => setCart({})} className="w-full text-xs font-bold text-slate-400 hover:text-red-500 transition-colors">
-              ล้างรายการทั้ง
+              ล้างรายการทั้งหมด
             </button>
           )}
         </div>
