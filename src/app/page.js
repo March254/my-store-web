@@ -14,7 +14,11 @@ export default function Home() {
   const [mode, setMode] = useState("withdraw");
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false); // เพิ่มสถานะ Admin
   const router = useRouter();
+
+  // กำหนด Email ของแอดมินที่นี่
+  const ADMIN_EMAILS = ["admin@email.com", "your-email@email.com"];
 
   useEffect(() => {
     const checkUser = async () => {
@@ -24,6 +28,8 @@ export default function Home() {
       } else {
         setUser(user);
         setBorrower(user.email);
+        // ตรวจสอบว่าเป็นแอดมินหรือไม่
+        setIsAdmin(ADMIN_EMAILS.includes(user.email));
         fetchProducts();
       }
     };
@@ -41,26 +47,35 @@ export default function Home() {
     setLoading(false);
   };
 
+  // ฟังก์ชันพิเศษสำหรับ Admin แก้ไขสต็อกโดยตรง
+  const handleAdminUpdateStock = async (id, newStock) => {
+    const stockNum = parseInt(newStock);
+    if (isNaN(stockNum) || stockNum < 0) return alert("กรุณาระบุจำนวนที่ถูกต้อง");
+
+    const { error } = await supabase.from('products').update({ stock: stockNum }).eq('id', id);
+    if (error) {
+      alert("ไม่สามารถแก้ไขได้: " + error.message);
+    } else {
+      fetchProducts(); // โหลดข้อมูลใหม่
+    }
+  };
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     router.push('/login');
   };
 
-  // --- ส่วนที่แก้ไข: เพิ่มการเช็คเงื่อนไขจำนวน ---
   const updateCart = (itemId, amount) => {
     const item = products.find(p => p.id == itemId);
     const currentQtyInCart = cart[itemId] || 0;
     const newQty = currentQtyInCart + amount;
 
     if (mode === "withdraw") {
-      // โหมดเบิก: ห้ามเบิกเกินจำนวนที่มีอยู่ในสต็อกปัจจุบัน
       if (newQty > item.stock) {
         alert(`ไม่สามารถเบิกเกินจำนวนที่มีอยู่ได้ (คงเหลือ: ${item.stock})`);
         return;
       }
     } else {
-      // โหมดคืน: ห้ามคืนจนยอดรวมในสต็อกเกินจำนวนที่กำหนดไว้สูงสุด (สมมติใช้ฟิลด์ max_stock ใน DB)
-      // หากไม่มีฟิลด์ max_stock ให้กำหนดค่าคงที่ เช่น 50 ตามที่คุณแจ้ง
       const maxLimit = item.max_stock || 50; 
       if (item.stock + newQty > maxLimit) {
         alert(`ไม่สามารถคืนเกินจำนวนที่กำหนดได้ (สต็อกสูงสุดคือ: ${maxLimit}, ปัจจุบันมี: ${item.stock})`);
@@ -85,9 +100,8 @@ export default function Home() {
       for (const [itemId, qty] of Object.entries(cart)) {
         const item = products.find(p => p.id == itemId);
         const newStock = mode === "withdraw" ? item.stock - qty : item.stock + qty;
-
-        // เช็คซ้ำอีกรอบก่อนบันทึกลง Database เพื่อความชัวร์
         const maxLimit = item.max_stock || 50;
+        
         if (mode === "return" && newStock > maxLimit) {
             throw new Error(`อุปกรณ์ ${item.name} มียอดเกินกำหนดไม่สามารถบันทึกได้`);
         }
@@ -119,21 +133,24 @@ export default function Home() {
       <div className="flex-1 p-6 lg:p-10">
         <div className="max-w-2xl mx-auto">
           
-          {/* Header Section */}
           <div className="flex justify-between items-center mb-8 bg-white p-5 rounded-3xl shadow-sm border border-slate-100">
             <div className="flex items-center gap-4">
               <img src="/logo.png" alt="Logo" className="w-14 h-14 rounded-2xl object-contain shadow-sm"
                 onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }} />
               <div style={{display: 'none'}} className="w-14 h-14 bg-blue-600 rounded-2xl items-center justify-center text-white text-xl font-black">M</div>
               <div>
-                <h1 className="text-2xl font-black tracking-tighter leading-none">MAKER<span className="text-blue-600">STOCK</span></h1>
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Inventory Management</p>
+                <h1 className="text-2xl font-black tracking-tighter leading-none">
+                  MAKER<span className="text-blue-600">STOCK</span>
+                </h1>
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">
+                  {isAdmin ? "Admin Management" : "Inventory Management"}
+                </p>
               </div>
             </div>
             <div className="flex items-center gap-4 border-l pl-4 border-slate-100">
               <div className="text-right hidden sm:block">
                 <p className="text-[10px] text-slate-400 font-black uppercase mb-1">User Active</p>
-                <p className="text-sm font-bold text-slate-700">{user.email}</p>
+                <p className={`text-sm font-bold ${isAdmin ? 'text-blue-600' : 'text-slate-700'}`}>{user.email}</p>
               </div>
               <button onClick={handleLogout} className="bg-red-50 text-red-600 p-2.5 rounded-xl hover:bg-red-100 transition-all border border-red-100">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -143,13 +160,11 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Mode Selector */}
           <div className="flex bg-white p-1.5 rounded-2xl border border-slate-200 mb-6 shadow-sm">
             <button onClick={() => {setMode("withdraw"); setCart({});}} className={`flex-1 py-4 rounded-xl font-black transition-all ${mode === 'withdraw' ? 'bg-blue-600 text-white shadow-lg shadow-blue-100' : 'text-slate-400 hover:bg-slate-50'}`}>เบิกอุปกรณ์</button>
             <button onClick={() => {setMode("return"); setCart({});}} className={`flex-1 py-4 rounded-xl font-black transition-all ${mode === 'return' ? 'bg-green-600 text-white shadow-lg shadow-green-100' : 'text-slate-400 hover:bg-slate-50'}`}>คืนอุปกรณ์</button>
           </div>
 
-          {/* ค้นหาและหมวดหมู่ */}
           <div className="relative mb-6">
             <input type="text" placeholder="ค้นหาอุปกรณ์..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full p-5 pl-12 bg-white border border-slate-200 rounded-3xl shadow-sm outline-none focus:ring-4 focus:ring-blue-50/50 transition-all text-lg font-medium" />
@@ -165,13 +180,29 @@ export default function Home() {
             ))}
           </div>
 
-          {/* รายการอุปกรณ์ */}
           <div className="grid grid-cols-1 gap-4">
             {loading ? (
               <div className="text-center py-20"><div className="inline-block w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div></div>
             ) : filteredProducts.length > 0 ? (
               filteredProducts.map((item) => (
-                <ItemCard key={item.id} item={item} quantityInCart={cart[item.id] || 0} onUpdate={updateCart} mode={mode} />
+                <div key={item.id} className="relative">
+                  <ItemCard item={item} quantityInCart={cart[item.id] || 0} onUpdate={updateCart} mode={mode} />
+                  
+                  {/* แสดงเฉพาะแอดมิน: ปุ่มแก้ไขจำนวน */}
+                  {isAdmin && (
+                    <div className="absolute top-2 right-2 flex gap-2">
+                      <button 
+                        onClick={() => {
+                          const newQty = prompt(`แก้ไขจำนวนสต็อกของ ${item.name}`, item.stock);
+                          if (newQty !== null) handleAdminUpdateStock(item.id, newQty);
+                        }}
+                        className="bg-white/80 backdrop-blur-sm border border-slate-200 text-[10px] font-bold px-2 py-1 rounded-lg hover:bg-slate-900 hover:text-white transition-all shadow-sm"
+                      >
+                        SET STOCK
+                      </button>
+                    </div>
+                  )}
+                </div>
               ))
             ) : (
               <div className="text-center py-20 bg-white rounded-3xl border border-dashed text-slate-400 font-bold">ไม่พบอุปกรณ์</div>
@@ -180,7 +211,6 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Cart Sidebar */}
       <div className="w-full lg:w-96 bg-white border-l border-slate-100 p-8 flex flex-col shadow-2xl lg:shadow-none sticky lg:top-0 h-fit lg:h-screen">
         <h2 className="text-2xl font-black mb-8 flex items-center gap-3">
           <span className="p-2 bg-slate-100 rounded-xl">📦</span> รายการ{mode === 'withdraw' ? 'เบิก' : 'คืน'}
