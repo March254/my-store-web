@@ -16,9 +16,9 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [groupedRequests, setGroupedRequests] = useState({}); 
+  const [myItems, setMyItems] = useState([]); // เก็บรายการที่ User เบิกไป
   const router = useRouter();
 
-  // --- 1. กำหนด Email แอดมินตรงนี้ ---
   const ADMIN_EMAILS = ["admin@email.com", "your-email@email.com"]; 
 
   useEffect(() => {
@@ -32,6 +32,7 @@ export default function Home() {
         const adminStatus = ADMIN_EMAILS.map(e => e.toLowerCase()).includes(user.email.toLowerCase());
         setIsAdmin(adminStatus);
         fetchProducts();
+        fetchMyBorrowedItems(user.email); // ดึงรายการที่เบิก
         if (adminStatus) fetchRequests();
       }
     };
@@ -47,6 +48,30 @@ export default function Home() {
       setCategories(uniqueCats);
     }
     setLoading(false);
+  };
+
+  // ฟังก์ชันดึงรายการที่ User คนนี้เบิกไปแล้วยังไม่ได้คืน (หรือประวัติทั้งหมด)
+  const fetchMyBorrowedItems = async (email) => {
+    const { data, error } = await supabase
+      .from('transaction_logs')
+      .select('*')
+      .eq('borrower_name', email);
+    
+    if (!error && data) {
+      // คำนวณยอดสุทธิ (เบิก - คืน) ของแต่ละชิ้น
+      const summary = data.reduce((acc, log) => {
+        const qty = log.type === 'withdraw' ? log.amount : -log.amount;
+        acc[log.product_name] = (acc[log.product_name] || 0) + qty;
+        return acc;
+      }, {});
+
+      // แปลงเป็น Array เพื่อแสดงผล เฉพาะชิ้นที่ยอด > 0
+      const displayItems = Object.entries(summary)
+        .filter(([_, qty]) => qty > 0)
+        .map(([name, qty]) => ({ name, qty }));
+      
+      setMyItems(displayItems);
+    }
   };
 
   const fetchRequests = async () => {
@@ -67,7 +92,6 @@ export default function Home() {
     }
   };
 
-  // ส่วนแก้ไขจำนวนสต็อกสำหรับแอดมิน
   const handleAdminUpdateStock = async (id, newStock) => {
     const stockNum = parseInt(newStock);
     if (isNaN(stockNum) || stockNum < 0) return alert("กรุณาระบุจำนวนที่ถูกต้อง");
@@ -75,8 +99,6 @@ export default function Home() {
     if (!error) {
       alert("อัปเดตสต็อกสำเร็จ");
       fetchProducts();
-    } else {
-      alert("เกิดข้อผิดพลาด: " + error.message);
     }
   };
 
@@ -99,6 +121,7 @@ export default function Home() {
       alert(decision === 'approved' ? "✅ อนุมัติคำขอทั้งหมดแล้ว" : "❌ ปฏิเสธคำขอทั้งหมดแล้ว");
       fetchRequests();
       fetchProducts();
+      if (user) fetchMyBorrowedItems(user.email); // อัปเดตรายการที่ถือครองหลังอนุมัติ
     } catch (error) {
       alert("เกิดข้อผิดพลาด");
     }
@@ -158,20 +181,38 @@ export default function Home() {
             <button onClick={handleLogout} className="bg-slate-900 text-white px-5 py-2.5 rounded-xl text-xs font-black shadow-md">LOGOUT</button>
           </div>
 
-          {/* คำขอสำหรับ Admin (แบบรวมกลุ่ม) */}
+          {/* ส่วนแสดงรายการที่ User เบิกไป (แสดงให้เห็นทุกคน) */}
+          {!isAdmin && myItems.length > 0 && (
+            <div className="mb-10 bg-gradient-to-br from-slate-800 to-slate-900 p-8 rounded-[2.5rem] shadow-xl text-white">
+              <h2 className="text-lg font-black mb-4 flex items-center gap-2">
+                📦 อุปกรณ์ที่คุณถือครองอยู่
+              </h2>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                {myItems.map((item, idx) => (
+                  <div key={idx} className="bg-white/10 p-4 rounded-2xl border border-white/10">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Item Name</p>
+                    <p className="font-black text-sm truncate">{item.name}</p>
+                    <p className="text-blue-400 font-black text-xl mt-1">x{item.qty}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Admin Requests Section (เหมือนเดิม) */}
           {isAdmin && Object.keys(groupedRequests).length > 0 && (
             <div className="mb-10 space-y-6">
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">คำขอรอดำเนินการ</p>
               {Object.entries(groupedRequests).map(([groupId, items]) => (
-                <div key={groupId} className="bg-white border-l-8 border-l-blue-600 p-8 rounded-[2.5rem] shadow-xl shadow-blue-50 border border-slate-100">
+                <div key={groupId} className="bg-white border-l-8 border-l-blue-600 p-8 rounded-[2.5rem] shadow-xl border border-slate-100">
                   <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                     <div>
                       <h3 className="font-black text-slate-800 text-lg uppercase">ใบเบิก/คืน #{groupId.slice(-5)}</h3>
                       <p className="text-xs font-bold text-slate-400">โดย: {items[0].borrower_name}</p>
                     </div>
-                    <div className="flex gap-2 w-full md:w-auto">
-                      <button onClick={() => handleDecideGroup(groupId, 'approved')} className="flex-1 md:flex-none bg-blue-600 text-white px-8 py-3 rounded-xl text-xs font-black shadow-lg hover:scale-105 transition-all">อนุมัติทั้งหมด</button>
-                      <button onClick={() => handleDecideGroup(groupId, 'rejected')} className="flex-1 md:flex-none bg-white text-red-500 border border-red-50 px-8 py-3 rounded-xl text-xs font-black hover:bg-red-50">ปฏิเสธ</button>
+                    <div className="flex gap-2">
+                      <button onClick={() => handleDecideGroup(groupId, 'approved')} className="bg-blue-600 text-white px-8 py-3 rounded-xl text-xs font-black shadow-lg">อนุมัติทั้งหมด</button>
+                      <button onClick={() => handleDecideGroup(groupId, 'rejected')} className="bg-white text-red-500 border border-red-50 px-8 py-3 rounded-xl text-xs font-black">ปฏิเสธ</button>
                     </div>
                   </div>
                   <div className="space-y-2 border-t pt-4">
@@ -187,7 +228,7 @@ export default function Home() {
             </div>
           )}
 
-          {/* Search & Modes */}
+          {/* Search & Products (เหมือนเดิม) */}
           <div className="relative mb-6">
             <input type="text" placeholder="ค้นหาอุปกรณ์..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full p-5 pl-14 bg-white border border-slate-200 rounded-3xl shadow-sm outline-none font-bold" />
             <span className="absolute left-6 top-1/2 -translate-y-1/2 opacity-30 text-xl">🔍</span>
@@ -198,30 +239,15 @@ export default function Home() {
             <button onClick={() => {setMode("return"); setCart({});}} className={`flex-1 py-4 rounded-xl font-black text-sm transition-all ${mode === 'return' ? 'bg-blue-600 text-white' : 'text-slate-400'}`}>คืนของ</button>
           </div>
 
-          <div className="mb-8">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 ml-1">Categories</p>
-            <div className="flex gap-2 overflow-x-auto pb-4 no-scrollbar">
-              {categories.map((cat) => (
-                <button key={cat} onClick={() => setActiveCategory(cat)} className={`px-7 py-3 rounded-2xl whitespace-nowrap font-black text-xs transition-all ${activeCategory === cat ? 'bg-blue-600 text-white shadow-xl scale-105' : 'bg-white text-slate-400 border border-slate-100'}`}>
-                  {cat === 'All' ? '📌 ทั้งหมด' : cat.toUpperCase()}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* รายการสินค้า */}
           <div className="grid grid-cols-1 gap-4">
             {loading ? <div className="text-center py-20 animate-spin">🌀</div> : filteredProducts.map((item) => (
               <div key={item.id} className="group relative">
                 <ItemCard item={item} quantityInCart={cart[item.id] || 0} onUpdate={updateCart} mode={mode} />
-                {/* ปุ่ม SET STOCK ที่กลับมาทำงานได้ปกติสำหรับ Admin */}
                 {isAdmin && (
                   <button onClick={() => {
                     const n = prompt(`แก้ไขสต็อก: ${item.name}`, item.stock);
                     if (n !== null) handleAdminUpdateStock(item.id, n);
-                  }} className="absolute top-4 right-4 z-20 bg-white/90 text-[9px] font-black px-3 py-1.5 rounded-xl border border-slate-200 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm">
-                    SET STOCK
-                  </button>
+                  }} className="absolute top-4 right-4 z-20 bg-white/90 text-[9px] font-black px-3 py-1.5 rounded-xl border border-slate-200 opacity-0 group-hover:opacity-100 transition-opacity">SET STOCK</button>
                 )}
               </div>
             ))}
