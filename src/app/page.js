@@ -18,7 +18,7 @@ export default function Home() {
   const [pendingRequests, setPendingRequests] = useState([]);
   const router = useRouter();
 
-  // --- 1. กำหนด Email แอดมินตรงนี้ (สำคัญมาก!) ---
+  // --- 1. กำหนด Email แอดมินตรงนี้ ---
   const ADMIN_EMAILS = ["admin@email.com", "your-email@email.com"]; 
 
   useEffect(() => {
@@ -30,13 +30,10 @@ export default function Home() {
         setUser(user);
         setBorrower(user.email);
         
-        // เช็คสิทธิ์แอดมิน (กันพลาดเรื่องตัวพิมพ์เล็ก/ใหญ่)
         const adminStatus = ADMIN_EMAILS.map(e => e.toLowerCase()).includes(user.email.toLowerCase());
         setIsAdmin(adminStatus);
         
         fetchProducts();
-        
-        // ถ้าเป็นแอดมิน ให้ดึงคำขอทันที
         if (adminStatus) {
           fetchRequests();
         }
@@ -77,17 +74,14 @@ export default function Home() {
     if (!error) fetchProducts();
   };
 
-  // --- 2. ฟังก์ชัน อนุมัติ / ไม่อนุมัติ สำหรับแอดมิน ---
   const handleDecideRequest = async (request, decision) => {
     try {
       if (decision === 'approved') {
         const item = products.find(p => p.id === request.product_id);
         const newStock = request.type === 'withdraw' ? item.stock - request.amount : item.stock + request.amount;
         
-        // ตัดสต็อกจริง
         await supabase.from('products').update({ stock: newStock }).eq('id', request.product_id);
         
-        // บันทึกประวัติ
         await supabase.from('transaction_logs').insert([{
           product_id: request.product_id,
           product_name: request.product_name,
@@ -97,7 +91,6 @@ export default function Home() {
         }]);
       }
 
-      // อัปเดตสถานะในตารางคำขอ
       await supabase.from('borrow_requests').update({ status: decision }).eq('id', request.id);
       
       alert(decision === 'approved' ? "✅ อนุมัติเรียบร้อย สต็อกอัปเดตแล้ว" : "❌ ปฏิเสธคำขอแล้ว");
@@ -171,10 +164,20 @@ export default function Home() {
       <div className="flex-1 p-4 lg:p-10">
         <div className="max-w-3xl mx-auto">
           
-          {/* Header */}
+          {/* Header พร้อมโลโก้ */}
           <div className="flex justify-between items-center mb-8 bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-black text-xl shadow-lg">M</div>
+              {/* ส่วนแสดงรูปโลโก้ */}
+              <div className="relative w-14 h-14">
+                <img 
+                  src="/logo.png" 
+                  alt="Logo" 
+                  className="w-full h-full object-contain rounded-2xl"
+                  onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
+                />
+                {/* Fallback กรณีรูปหาย จะแสดงตัว M แทน */}
+                <div className="hidden absolute inset-0 bg-blue-600 rounded-2xl items-center justify-center text-white font-black text-xl shadow-lg">M</div>
+              </div>
               <div>
                 <h1 className="text-xl font-black text-slate-800 tracking-tighter uppercase">Maker<span className="text-blue-600">Stock</span></h1>
                 <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">{isAdmin ? 'Admin Management' : 'User Inventory'}</p>
@@ -183,7 +186,7 @@ export default function Home() {
             <button onClick={handleLogout} className="bg-slate-900 text-white px-5 py-2.5 rounded-xl text-xs font-black hover:bg-red-600 transition-all shadow-md">LOGOUT</button>
           </div>
 
-          {/* --- 3. ส่วนแสดงคำขอสำหรับ Admin (จะขึ้นบนสุด) --- */}
+          {/* คำขอสำหรับ Admin */}
           {isAdmin && pendingRequests.length > 0 && (
             <div className="mb-10 bg-white border-l-8 border-l-blue-600 border border-slate-100 p-8 rounded-[2.5rem] shadow-xl shadow-blue-50">
               <h2 className="text-xl font-black text-slate-800 mb-6 flex items-center gap-3">
@@ -224,7 +227,7 @@ export default function Home() {
             <button onClick={() => {setMode("return"); setCart({});}} className={`flex-1 py-4 rounded-xl font-black text-sm transition-all ${mode === 'return' ? 'bg-blue-600 text-white' : 'text-slate-400'}`}>คืนของ</button>
           </div>
 
-          {/* --- 4. หมวดหมู่ดีไซน์ใหม่ (Font หนา ดูดี) --- */}
+          {/* หมวดหมู่ดีไซน์ใหม่ */}
           <div className="mb-8">
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 ml-1">Categories</p>
             <div className="flex gap-2 overflow-x-auto pb-4 no-scrollbar">
