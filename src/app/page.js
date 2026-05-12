@@ -111,7 +111,7 @@ export default function Home() {
       alert("ดำเนินการเรียบร้อย");
       fetchRequests(); fetchProducts();
       if (user) fetchMyBorrowedItems(user.email);
-    } catch (error) { alert("Error"); }
+    } catch (error) { alert("เกิดข้อผิดพลาด"); }
   };
 
   const updateCart = (itemId, amount) => {
@@ -125,16 +125,12 @@ export default function Home() {
         return;
       }
     } else {
-      // --- เช็คจำนวนที่ถือครองอยู่จริง ---
       const borrowedItem = myItems.find(i => i.name === item.name);
       const currentlyHolding = borrowedItem ? borrowedItem.qty : 0;
-
       if (newQty > currentlyHolding) {
         alert(`คุณคืนเกินจำนวนที่มี! (คุณถือครองอยู่ ${currentlyHolding} ชิ้น)`);
         return;
       }
-      
-      // ป้องกันการล็อกเพดาน 50
       const maxLimit = Math.max(item.stock, 100); 
       if (item.stock + newQty > maxLimit) {
         alert(`สต็อกรวมจะเกินกำหนด`);
@@ -152,7 +148,7 @@ export default function Home() {
   };
 
   const handleConfirmAction = async () => {
-    if (!borrower || Object.keys(cart).length === 0) return alert("กรุณาเลือกของ!");
+    if (!borrower || Object.keys(cart).length === 0) return alert("กรุณาเลือกของก่อน!");
     const groupId = `GRP-${Date.now()}`;
     try {
       const inserts = Object.entries(cart).map(([itemId, qty]) => {
@@ -165,7 +161,7 @@ export default function Home() {
       await supabase.from('borrow_requests').insert(inserts);
       alert("ส่งคำขอสำเร็จ! รอแอดมินอนุมัติ");
       setCart({});
-    } catch (error) { alert("Error"); }
+    } catch (error) { alert("ส่งไม่สำเร็จ"); }
   };
 
   const handleLogout = async () => { await supabase.auth.signOut(); router.push('/login'); };
@@ -177,7 +173,7 @@ export default function Home() {
     <main className="min-h-screen bg-[#F8FAFC] flex flex-col lg:flex-row font-sans text-slate-900">
       <div className="flex-1 p-4 lg:p-10">
         <div className="max-w-3xl mx-auto">
-          {/* Header ที่แก้ไขโลโก้แล้ว */}
+          {/* Header พร้อมโลโก้และชื่อ User */}
           <div className="flex justify-between items-center mb-8 bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
             <div className="flex items-center gap-4">
               <div className="relative w-14 h-14">
@@ -194,13 +190,20 @@ export default function Home() {
               </div>
               <div>
                 <h1 className="text-xl font-black tracking-tighter uppercase">Maker<span className="text-blue-600">Stock</span></h1>
-                <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">{isAdmin ? 'Admin' : 'User'}</p>
+                <div className="flex flex-col">
+                  <p className="text-[10px] font-black uppercase text-blue-600 tracking-widest leading-tight">
+                    {isAdmin ? 'ADMIN' : 'USER'}
+                  </p>
+                  <p className="text-[9px] font-bold text-slate-400 leading-tight truncate max-w-[150px]">
+                    {user?.email}
+                  </p>
+                </div>
               </div>
             </div>
             <button onClick={handleLogout} className="bg-slate-900 text-white px-5 py-2.5 rounded-xl text-xs font-black shadow-md">LOGOUT</button>
           </div>
 
-          {/* อุปกรณ์ที่ถือครอง */}
+          {/* อุปกรณ์ที่ถือครอง (User เท่านั้น) */}
           {!isAdmin && myItems.length > 0 && (
             <div className="mb-10 bg-slate-900 p-8 rounded-[2.5rem] shadow-xl text-white">
               <h2 className="text-lg font-black mb-4 flex items-center gap-2">📦 อุปกรณ์ที่คุณถือครองอยู่</h2>
@@ -246,7 +249,7 @@ export default function Home() {
 
           {/* Search & Modes */}
           <div className="relative mb-6">
-            <input type="text" placeholder="ค้นหาอุปกรณ์..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full p-5 pl-14 bg-white border border-slate-200 rounded-3xl shadow-sm outline-none font-bold focus:ring-4 focus:ring-blue-50" />
+            <input type="text" placeholder="ค้นหาอุปกรณ์..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full p-5 pl-14 bg-white border border-slate-200 rounded-3xl shadow-sm outline-none font-bold focus:ring-4 focus:ring-blue-50 transition-all" />
             <span className="absolute left-6 top-1/2 -translate-y-1/2 opacity-30 text-xl">🔍</span>
           </div>
 
