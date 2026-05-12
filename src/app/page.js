@@ -91,7 +91,7 @@ export default function Home() {
     if (isNaN(stockNum) || stockNum < 0) return alert("กรุณาระบุจำนวนที่ถูกต้อง");
     const { error } = await supabase.from('products').update({ stock: stockNum }).eq('id', id);
     if (!error) {
-      alert("อัปเดตสต็อกเรียบร้อย (เพดานการคืนจะปรับตามค่านี้นะครับ)");
+      alert("อัปเดตสต็อกเรียบร้อยแล้ว");
       fetchProducts();
     }
   };
@@ -111,7 +111,7 @@ export default function Home() {
         }
         await supabase.from('borrow_requests').update({ status: decision }).eq('id', req.id);
       }
-      alert(decision === 'approved' ? "✅ อนุมัติคำขอทั้งหมดแล้ว" : "❌ ปฏิเสธคำขอแล้ว");
+      alert(decision === 'approved' ? "✅ อนุมัติเรียบร้อย" : "❌ ปฏิเสธคำขอแล้ว");
       fetchRequests();
       fetchProducts();
       if (user) fetchMyBorrowedItems(user.email);
@@ -129,8 +129,9 @@ export default function Home() {
         return;
       }
     } else {
-      // แก้ไข: ใช้ค่าที่มากที่สุดระหว่าง Stock ปัจจุบัน หรือ 50 เพื่อป้องกันการล็อกเพดาน
-      const maxLimit = Math.max(item.stock, 50); 
+      // --- ปลดล็อกเพดาน 50 โดยใช้ค่าสต็อกที่มีอยู่จริง + 50 เป็นค่าพื้นฐาน ---
+      // หรือถ้าแอดมินเซ็ตไว้เท่าไหร่ ให้ใช้ค่านั้นเป็น Max
+      const maxLimit = Math.max(item.stock, 100); 
       if (item.stock + newQty > maxLimit) {
         alert(`คืนไม่ได้! จำนวนรวมจะเกินสต็อกสูงสุดที่ตั้งไว้ (${maxLimit})`);
         return;
@@ -175,10 +176,7 @@ export default function Home() {
           {/* Header */}
           <div className="flex justify-between items-center mb-8 bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
             <div className="flex items-center gap-4">
-              <div className="relative w-14 h-14">
-                <img src="/logo.png" alt="Logo" className="w-full h-full object-contain rounded-2xl" onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }} />
-                <div className="hidden absolute inset-0 bg-blue-600 rounded-2xl items-center justify-center text-white font-black text-xl">M</div>
-              </div>
+              <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-black text-xl shadow-lg">M</div>
               <div>
                 <h1 className="text-xl font-black text-slate-800 tracking-tighter uppercase">Maker<span className="text-blue-600">Stock</span></h1>
                 <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">{isAdmin ? 'Admin Management' : 'User Inventory'}</p>
@@ -187,10 +185,10 @@ export default function Home() {
             <button onClick={handleLogout} className="bg-slate-900 text-white px-5 py-2.5 rounded-xl text-xs font-black shadow-md">LOGOUT</button>
           </div>
 
-          {/* อุปกรณ์ที่ถือครอง (แสดงเฉพาะ User) */}
+          {/* อุปกรณ์ที่ถือครอง (เฉพาะ User) */}
           {!isAdmin && myItems.length > 0 && (
             <div className="mb-10 bg-slate-900 p-8 rounded-[2.5rem] shadow-xl text-white">
-              <h2 className="text-lg font-black mb-4 flex items-center gap-2">📦 อุปกรณ์ที่คุณถือครองอยู่</h2>
+              <h2 className="text-lg font-black mb-4">📦 อุปกรณ์ที่คุณถือครองอยู่</h2>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 {myItems.map((item, idx) => (
                   <div key={idx} className="bg-white/10 p-4 rounded-2xl border border-white/10">
@@ -203,19 +201,18 @@ export default function Home() {
             </div>
           )}
 
-          {/* คำขอสำหรับ Admin (รวมกลุ่ม) */}
+          {/* Admin Requests */}
           {isAdmin && Object.keys(groupedRequests).length > 0 && (
             <div className="mb-10 space-y-6">
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">คำขอรอดำเนินการ</p>
               {Object.entries(groupedRequests).map(([groupId, items]) => (
                 <div key={groupId} className="bg-white border-l-8 border-l-blue-600 p-8 rounded-[2.5rem] shadow-xl border border-slate-100">
                   <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                     <div>
-                      <h3 className="font-black text-slate-800 text-lg uppercase">ใบเบิก/คืน #{groupId.slice(-5)}</h3>
+                      <h3 className="font-black text-slate-800 text-lg uppercase tracking-tighter">ใบเบิก/คืน #{groupId.slice(-5)}</h3>
                       <p className="text-xs font-bold text-slate-400">โดย: {items[0].borrower_name}</p>
                     </div>
                     <div className="flex gap-2">
-                      <button onClick={() => handleDecideGroup(groupId, 'approved')} className="bg-blue-600 text-white px-8 py-3 rounded-xl text-xs font-black shadow-lg">อนุมัติทั้งหมด</button>
+                      <button onClick={() => handleDecideGroup(groupId, 'approved')} className="bg-blue-600 text-white px-8 py-3 rounded-xl text-xs font-black shadow-lg">อนุมัติ</button>
                       <button onClick={() => handleDecideGroup(groupId, 'rejected')} className="bg-white text-red-500 border border-red-50 px-8 py-3 rounded-xl text-xs font-black">ปฏิเสธ</button>
                     </div>
                   </div>
@@ -234,7 +231,7 @@ export default function Home() {
 
           {/* Search & Modes */}
           <div className="relative mb-6">
-            <input type="text" placeholder="ค้นหาอุปกรณ์..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full p-5 pl-14 bg-white border border-slate-200 rounded-3xl shadow-sm outline-none font-bold focus:ring-4 focus:ring-blue-50 transition-all" />
+            <input type="text" placeholder="ค้นหาอุปกรณ์..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full p-5 pl-14 bg-white border border-slate-200 rounded-3xl shadow-sm outline-none font-bold" />
             <span className="absolute left-6 top-1/2 -translate-y-1/2 opacity-30 text-xl">🔍</span>
           </div>
 
@@ -243,7 +240,7 @@ export default function Home() {
             <button onClick={() => {setMode("return"); setCart({});}} className={`flex-1 py-4 rounded-xl font-black text-sm transition-all ${mode === 'return' ? 'bg-blue-600 text-white' : 'text-slate-400'}`}>คืนของ</button>
           </div>
 
-          {/* รายการสินค้า */}
+          {/* Products List */}
           <div className="grid grid-cols-1 gap-4">
             {loading ? <div className="text-center py-20 animate-spin">🌀</div> : filteredProducts.map((item) => (
               <div key={item.id} className="group relative">
@@ -252,7 +249,7 @@ export default function Home() {
                   <button onClick={() => {
                     const n = prompt(`แก้ไขสต็อก: ${item.name}`, item.stock);
                     if (n !== null) handleAdminUpdateStock(item.id, n);
-                  }} className="absolute top-4 right-4 z-20 bg-white/90 text-[9px] font-black px-3 py-1.5 rounded-xl border border-slate-200 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm">SET STOCK</button>
+                  }} className="absolute top-4 right-4 z-20 bg-white/90 text-[9px] font-black px-3 py-1.5 rounded-xl border border-slate-200 opacity-0 group-hover:opacity-100 transition-opacity">SET STOCK</button>
                 )}
               </div>
             ))}
@@ -277,7 +274,7 @@ export default function Home() {
             );
           })}
         </div>
-        <button onClick={handleConfirmAction} disabled={Object.keys(cart).length === 0} className={`w-full py-5 rounded-[2rem] font-black text-white text-lg mt-8 shadow-2xl transition-all active:scale-95 ${mode === 'withdraw' ? 'bg-slate-900' : 'bg-blue-600'}`}>ยืนยันส่งคำขอ</button>
+        <button onClick={handleConfirmAction} disabled={Object.keys(cart).length === 0} className={`w-full py-5 rounded-[2rem] font-black text-white text-lg mt-8 ${mode === 'withdraw' ? 'bg-slate-900' : 'bg-blue-600'}`}>ยืนยันส่งคำขอ</button>
       </div>
     </main>
   );
