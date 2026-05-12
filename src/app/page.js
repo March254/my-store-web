@@ -16,9 +16,10 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [groupedRequests, setGroupedRequests] = useState({}); 
-  const [myItems, setMyItems] = useState([]); // เก็บรายการที่ User เบิกไป
+  const [myItems, setMyItems] = useState([]);
   const router = useRouter();
 
+  // --- 1. กำหนด Email แอดมินตรงนี้ ---
   const ADMIN_EMAILS = ["admin@email.com", "your-email@email.com"]; 
 
   useEffect(() => {
@@ -32,7 +33,7 @@ export default function Home() {
         const adminStatus = ADMIN_EMAILS.map(e => e.toLowerCase()).includes(user.email.toLowerCase());
         setIsAdmin(adminStatus);
         fetchProducts();
-        fetchMyBorrowedItems(user.email); // ดึงรายการที่เบิก
+        fetchMyBorrowedItems(user.email);
         if (adminStatus) fetchRequests();
       }
     };
@@ -50,26 +51,20 @@ export default function Home() {
     setLoading(false);
   };
 
-  // ฟังก์ชันดึงรายการที่ User คนนี้เบิกไปแล้วยังไม่ได้คืน (หรือประวัติทั้งหมด)
   const fetchMyBorrowedItems = async (email) => {
     const { data, error } = await supabase
       .from('transaction_logs')
       .select('*')
       .eq('borrower_name', email);
-    
     if (!error && data) {
-      // คำนวณยอดสุทธิ (เบิก - คืน) ของแต่ละชิ้น
       const summary = data.reduce((acc, log) => {
         const qty = log.type === 'withdraw' ? log.amount : -log.amount;
         acc[log.product_name] = (acc[log.product_name] || 0) + qty;
         return acc;
       }, {});
-
-      // แปลงเป็น Array เพื่อแสดงผล เฉพาะชิ้นที่ยอด > 0
       const displayItems = Object.entries(summary)
         .filter(([_, qty]) => qty > 0)
         .map(([name, qty]) => ({ name, qty }));
-      
       setMyItems(displayItems);
     }
   };
@@ -80,7 +75,6 @@ export default function Home() {
       .select('*')
       .eq('status', 'pending')
       .order('created_at', { ascending: false });
-    
     if (!error && data) {
       const groups = data.reduce((acc, item) => {
         const id = item.group_id || 'no-group';
@@ -97,7 +91,7 @@ export default function Home() {
     if (isNaN(stockNum) || stockNum < 0) return alert("กรุณาระบุจำนวนที่ถูกต้อง");
     const { error } = await supabase.from('products').update({ stock: stockNum }).eq('id', id);
     if (!error) {
-      alert("อัปเดตสต็อกสำเร็จ");
+      alert("อัปเดตสต็อกเรียบร้อยแล้ว (เพดานการคืนจะปรับตามอัตโนมัติ)");
       fetchProducts();
     }
   };
@@ -109,7 +103,6 @@ export default function Home() {
         if (decision === 'approved') {
           const item = products.find(p => p.id == req.product_id);
           const newStock = req.type === 'withdraw' ? item.stock - req.amount : item.stock + req.amount;
-          
           await supabase.from('products').update({ stock: newStock }).eq('id', req.product_id);
           await supabase.from('transaction_logs').insert([{
             product_id: req.product_id, product_name: req.product_name,
@@ -118,46 +111,59 @@ export default function Home() {
         }
         await supabase.from('borrow_requests').update({ status: decision }).eq('id', req.id);
       }
-      alert(decision === 'approved' ? "✅ อนุมัติคำขอทั้งหมดแล้ว" : "❌ ปฏิเสธคำขอทั้งหมดแล้ว");
+      alert(decision === 'approved' ? "✅ อนุมัติแล้ว" : "❌ ปฏิเสธแล้ว");
       fetchRequests();
       fetchProducts();
-      if (user) fetchMyBorrowedItems(user.email); // อัปเดตรายการที่ถือครองหลังอนุมัติ
-    } catch (error) {
-      alert("เกิดข้อผิดพลาด");
+      if (user) fetchMyBorrowedItems(user.email);
+    } catch (error) { alert("Error process request"); }
+  };
+
+  const updateCart = (itemId, amount) => {
+    const item = products.find(p => p.id == itemId);
+    const currentQtyInCart = cart[itemId] || 0;
+    const newQty = currentQtyInCart + amount;
+
+    if (mode === "withdraw") {
+      if (newQty > item.stock) {
+        alert(`ของในสต็อกไม่พอ (เหลือ ${item.stock})`);
+        return;
+      }
+    } else {
+      // --- จุดแก้ไขสำคัญ: ปรับเพดานตามสต็อกจริง ---
+      const maxLimit = Math.max(item.stock, 50); 
+      if (item.stock + newQty > maxLimit) {
+        alert(`คืนไม่ได้! จำนวนรวมจะเกินสต็อกสูงสุดที่ตั้งไว้ (${maxLimit})`);
+        return;
+      }
     }
+
+    setCart(prev => {
+      if (newQty <= 0) {
+        const { [itemId]: _, ...rest } = prev;
+        return rest;
+      }
+      return { ...prev, [itemId]: newQty };
+    });
   };
 
   const handleConfirmAction = async () => {
-    if (!borrower || Object.keys(cart).length === 0) return alert("กรุณาเลือกของก่อน!");
+    if (!borrower || Object.keys(cart).length === 0) return alert("กรุณาเลือกของ!");
     const groupId = `GRP-${Date.now()}`;
     try {
       const inserts = Object.entries(cart).map(([itemId, qty]) => {
         const item = products.find(p => p.id == itemId);
         return { 
-          product_id: itemId, product_name: item.name, 
-          amount: qty, borrower_name: borrower, 
-          type: mode, status: 'pending', group_id: groupId
+          product_id: itemId, product_name: item.name, amount: qty, 
+          borrower_name: borrower, type: mode, status: 'pending', group_id: groupId
         };
       });
       await supabase.from('borrow_requests').insert(inserts);
-      alert("ส่งคำขอสำเร็จ! รอแอดมินอนุมัติ");
+      alert("ส่งคำขอสำเร็จ!");
       setCart({});
-    } catch (error) {
-      alert("ส่งไม่สำเร็จ");
-    }
+    } catch (error) { alert("ส่งไม่สำเร็จ"); }
   };
 
   const handleLogout = async () => { await supabase.auth.signOut(); router.push('/login'); };
-  
-  const updateCart = (itemId, amount) => {
-    const item = products.find(p => p.id == itemId);
-    const currentQtyInCart = cart[itemId] || 0;
-    const newQty = currentQtyInCart + amount;
-    if (mode === "withdraw" && newQty > item.stock) return alert(`สต็อกไม่พอ`);
-    if (mode === "return" && item.stock + newQty > (item.max_stock || 50)) return alert(`เกินจำนวนสูงสุด`);
-    setCart(prev => (newQty <= 0 ? (({ [itemId]: _, ...r }) => r)(prev) : { ...prev, [itemId]: newQty }));
-  };
-
   const filteredProducts = products.filter(item => item.name.toLowerCase().includes(searchTerm.toLowerCase()) && (activeCategory === "All" || item.category === activeCategory));
 
   if (!user) return null;
@@ -178,19 +184,17 @@ export default function Home() {
                 <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">{isAdmin ? 'Admin Management' : 'User Inventory'}</p>
               </div>
             </div>
-            <button onClick={handleLogout} className="bg-slate-900 text-white px-5 py-2.5 rounded-xl text-xs font-black shadow-md">LOGOUT</button>
+            <button onClick={handleLogout} className="bg-slate-900 text-white px-5 py-2.5 rounded-xl text-xs font-black">LOGOUT</button>
           </div>
 
-          {/* ส่วนแสดงรายการที่ User เบิกไป (แสดงให้เห็นทุกคน) */}
+          {/* อุปกรณ์ที่ถือครอง (User) */}
           {!isAdmin && myItems.length > 0 && (
-            <div className="mb-10 bg-gradient-to-br from-slate-800 to-slate-900 p-8 rounded-[2.5rem] shadow-xl text-white">
-              <h2 className="text-lg font-black mb-4 flex items-center gap-2">
-                📦 อุปกรณ์ที่คุณถือครองอยู่
-              </h2>
+            <div className="mb-10 bg-slate-900 p-8 rounded-[2.5rem] shadow-xl text-white">
+              <h2 className="text-lg font-black mb-4">📦 อุปกรณ์ที่คุณถือครองอยู่</h2>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 {myItems.map((item, idx) => (
                   <div key={idx} className="bg-white/10 p-4 rounded-2xl border border-white/10">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Item Name</p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase">Item Name</p>
                     <p className="font-black text-sm truncate">{item.name}</p>
                     <p className="text-blue-400 font-black text-xl mt-1">x{item.qty}</p>
                   </div>
@@ -199,10 +203,9 @@ export default function Home() {
             </div>
           )}
 
-          {/* Admin Requests Section (เหมือนเดิม) */}
+          {/* คำขอสำหรับ Admin */}
           {isAdmin && Object.keys(groupedRequests).length > 0 && (
             <div className="mb-10 space-y-6">
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">คำขอรอดำเนินการ</p>
               {Object.entries(groupedRequests).map(([groupId, items]) => (
                 <div key={groupId} className="bg-white border-l-8 border-l-blue-600 p-8 rounded-[2.5rem] shadow-xl border border-slate-100">
                   <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
@@ -211,7 +214,7 @@ export default function Home() {
                       <p className="text-xs font-bold text-slate-400">โดย: {items[0].borrower_name}</p>
                     </div>
                     <div className="flex gap-2">
-                      <button onClick={() => handleDecideGroup(groupId, 'approved')} className="bg-blue-600 text-white px-8 py-3 rounded-xl text-xs font-black shadow-lg">อนุมัติทั้งหมด</button>
+                      <button onClick={() => handleDecideGroup(groupId, 'approved')} className="bg-blue-600 text-white px-8 py-3 rounded-xl text-xs font-black">อนุมัติทั้งหมด</button>
                       <button onClick={() => handleDecideGroup(groupId, 'rejected')} className="bg-white text-red-500 border border-red-50 px-8 py-3 rounded-xl text-xs font-black">ปฏิเสธ</button>
                     </div>
                   </div>
@@ -228,12 +231,11 @@ export default function Home() {
             </div>
           )}
 
-          {/* Search & Products (เหมือนเดิม) */}
+          {/* Search & Modes */}
           <div className="relative mb-6">
             <input type="text" placeholder="ค้นหาอุปกรณ์..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full p-5 pl-14 bg-white border border-slate-200 rounded-3xl shadow-sm outline-none font-bold" />
             <span className="absolute left-6 top-1/2 -translate-y-1/2 opacity-30 text-xl">🔍</span>
           </div>
-
           <div className="flex bg-white p-1.5 rounded-2xl border border-slate-200 mb-8 shadow-sm">
             <button onClick={() => {setMode("withdraw"); setCart({});}} className={`flex-1 py-4 rounded-xl font-black text-sm transition-all ${mode === 'withdraw' ? 'bg-slate-900 text-white' : 'text-slate-400'}`}>เบิกของ</button>
             <button onClick={() => {setMode("return"); setCart({});}} className={`flex-1 py-4 rounded-xl font-black text-sm transition-all ${mode === 'return' ? 'bg-blue-600 text-white' : 'text-slate-400'}`}>คืนของ</button>
