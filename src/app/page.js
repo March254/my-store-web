@@ -19,7 +19,6 @@ export default function Home() {
   const [myItems, setMyItems] = useState([]);
   const router = useRouter();
 
-  // --- 1. กำหนด Email แอดมินตรงนี้ ---
   const ADMIN_EMAILS = ["admin@email.com", "your-email@email.com"]; 
 
   useEffect(() => {
@@ -90,10 +89,7 @@ export default function Home() {
     const stockNum = parseInt(newStock);
     if (isNaN(stockNum) || stockNum < 0) return alert("กรุณาระบุจำนวนที่ถูกต้อง");
     const { error } = await supabase.from('products').update({ stock: stockNum }).eq('id', id);
-    if (!error) {
-      alert("อัปเดตสต็อกเรียบร้อยแล้ว");
-      fetchProducts();
-    }
+    if (!error) { fetchProducts(); alert("อัปเดตสต็อกแล้ว"); }
   };
 
   const handleDecideGroup = async (groupId, decision) => {
@@ -111,11 +107,10 @@ export default function Home() {
         }
         await supabase.from('borrow_requests').update({ status: decision }).eq('id', req.id);
       }
-      alert(decision === 'approved' ? "✅ อนุมัติเรียบร้อย" : "❌ ปฏิเสธคำขอแล้ว");
-      fetchRequests();
-      fetchProducts();
+      alert("ดำเนินการเรียบร้อย");
+      fetchRequests(); fetchProducts();
       if (user) fetchMyBorrowedItems(user.email);
-    } catch (error) { alert("เกิดข้อผิดพลาด"); }
+    } catch (error) { alert("Error"); }
   };
 
   const updateCart = (itemId, amount) => {
@@ -129,11 +124,19 @@ export default function Home() {
         return;
       }
     } else {
-      // --- ปลดล็อกเพดาน 50 โดยใช้ค่าสต็อกที่มีอยู่จริง + 50 เป็นค่าพื้นฐาน ---
-      // หรือถ้าแอดมินเซ็ตไว้เท่าไหร่ ให้ใช้ค่านั้นเป็น Max
+      // --- ปรับปรุงใหม่: เช็คว่าคืนเกินที่เบิกไปไหม ---
+      const borrowedItem = myItems.find(i => i.name === item.name);
+      const currentlyHolding = borrowedItem ? borrowedItem.qty : 0;
+
+      if (newQty > currentlyHolding) {
+        alert(`คุณคืนเกินจำนวนที่มี! (คุณถือครองอยู่ ${currentlyHolding} ชิ้น)`);
+        return;
+      }
+      
+      // เช็คเพดานสต็อกรวมด้วย (เผื่อแอดมินลดจำนวนของลง)
       const maxLimit = Math.max(item.stock, 100); 
       if (item.stock + newQty > maxLimit) {
-        alert(`คืนไม่ได้! จำนวนรวมจะเกินสต็อกสูงสุดที่ตั้งไว้ (${maxLimit})`);
+        alert(`สต็อกรวมจะเกินกำหนด`);
         return;
       }
     }
@@ -148,7 +151,7 @@ export default function Home() {
   };
 
   const handleConfirmAction = async () => {
-    if (!borrower || Object.keys(cart).length === 0) return alert("กรุณาเลือกของก่อน!");
+    if (!borrower || Object.keys(cart).length === 0) return alert("กรุณาเลือกของ!");
     const groupId = `GRP-${Date.now()}`;
     try {
       const inserts = Object.entries(cart).map(([itemId, qty]) => {
@@ -159,9 +162,9 @@ export default function Home() {
         };
       });
       await supabase.from('borrow_requests').insert(inserts);
-      alert("ส่งคำขอสำเร็จ! รอแอดมินอนุมัติ");
+      alert("ส่งคำขอสำเร็จ");
       setCart({});
-    } catch (error) { alert("ส่งไม่สำเร็จ"); }
+    } catch (error) { alert("Error"); }
   };
 
   const handleLogout = async () => { await supabase.auth.signOut(); router.push('/login'); };
@@ -170,22 +173,22 @@ export default function Home() {
   if (!user) return null;
 
   return (
-    <main className="min-h-screen bg-[#F8FAFC] flex flex-col lg:flex-row font-sans">
+    <main className="min-h-screen bg-[#F8FAFC] flex flex-col lg:flex-row font-sans text-slate-900">
       <div className="flex-1 p-4 lg:p-10">
         <div className="max-w-3xl mx-auto">
           {/* Header */}
           <div className="flex justify-between items-center mb-8 bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-black text-xl shadow-lg">M</div>
+              <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-black text-xl">M</div>
               <div>
-                <h1 className="text-xl font-black text-slate-800 tracking-tighter uppercase">Maker<span className="text-blue-600">Stock</span></h1>
-                <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">{isAdmin ? 'Admin Management' : 'User Inventory'}</p>
+                <h1 className="text-xl font-black tracking-tighter uppercase">Maker<span className="text-blue-600">Stock</span></h1>
+                <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">{isAdmin ? 'Admin' : 'User'}</p>
               </div>
             </div>
-            <button onClick={handleLogout} className="bg-slate-900 text-white px-5 py-2.5 rounded-xl text-xs font-black shadow-md">LOGOUT</button>
+            <button onClick={handleLogout} className="bg-slate-900 text-white px-5 py-2.5 rounded-xl text-xs font-black">LOGOUT</button>
           </div>
 
-          {/* อุปกรณ์ที่ถือครอง (เฉพาะ User) */}
+          {/* ประวัติการถือครอง (User) */}
           {!isAdmin && myItems.length > 0 && (
             <div className="mb-10 bg-slate-900 p-8 rounded-[2.5rem] shadow-xl text-white">
               <h2 className="text-lg font-black mb-4">📦 อุปกรณ์ที่คุณถือครองอยู่</h2>
@@ -208,11 +211,11 @@ export default function Home() {
                 <div key={groupId} className="bg-white border-l-8 border-l-blue-600 p-8 rounded-[2.5rem] shadow-xl border border-slate-100">
                   <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                     <div>
-                      <h3 className="font-black text-slate-800 text-lg uppercase tracking-tighter">ใบเบิก/คืน #{groupId.slice(-5)}</h3>
+                      <h3 className="font-black text-slate-800 text-lg uppercase">ใบเบิก/คืน #{groupId.slice(-5)}</h3>
                       <p className="text-xs font-bold text-slate-400">โดย: {items[0].borrower_name}</p>
                     </div>
                     <div className="flex gap-2">
-                      <button onClick={() => handleDecideGroup(groupId, 'approved')} className="bg-blue-600 text-white px-8 py-3 rounded-xl text-xs font-black shadow-lg">อนุมัติ</button>
+                      <button onClick={() => handleDecideGroup(groupId, 'approved')} className="bg-blue-600 text-white px-8 py-3 rounded-xl text-xs font-black">อนุมัติ</button>
                       <button onClick={() => handleDecideGroup(groupId, 'rejected')} className="bg-white text-red-500 border border-red-50 px-8 py-3 rounded-xl text-xs font-black">ปฏิเสธ</button>
                     </div>
                   </div>
@@ -240,7 +243,6 @@ export default function Home() {
             <button onClick={() => {setMode("return"); setCart({});}} className={`flex-1 py-4 rounded-xl font-black text-sm transition-all ${mode === 'return' ? 'bg-blue-600 text-white' : 'text-slate-400'}`}>คืนของ</button>
           </div>
 
-          {/* Products List */}
           <div className="grid grid-cols-1 gap-4">
             {loading ? <div className="text-center py-20 animate-spin">🌀</div> : filteredProducts.map((item) => (
               <div key={item.id} className="group relative">
