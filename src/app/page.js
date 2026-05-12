@@ -15,9 +15,10 @@ export default function Home() {
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [groupedRequests, setGroupedRequests] = useState({}); // เปลี่ยนเป็น Object สำหรับจัดกลุ่ม
+  const [groupedRequests, setGroupedRequests] = useState({}); 
   const router = useRouter();
 
+  // --- 1. กำหนด Email แอดมินตรงนี้ ---
   const ADMIN_EMAILS = ["admin@email.com", "your-email@email.com"]; 
 
   useEffect(() => {
@@ -48,7 +49,6 @@ export default function Home() {
     setLoading(false);
   };
 
-  // ดึงข้อมูลและจัดกลุ่มตาม group_id
   const fetchRequests = async () => {
     const { data, error } = await supabase
       .from('borrow_requests')
@@ -67,13 +67,25 @@ export default function Home() {
     }
   };
 
-  // ฟังก์ชันอนุมัติทั้งกลุ่ม
+  // ส่วนแก้ไขจำนวนสต็อกสำหรับแอดมิน
+  const handleAdminUpdateStock = async (id, newStock) => {
+    const stockNum = parseInt(newStock);
+    if (isNaN(stockNum) || stockNum < 0) return alert("กรุณาระบุจำนวนที่ถูกต้อง");
+    const { error } = await supabase.from('products').update({ stock: stockNum }).eq('id', id);
+    if (!error) {
+      alert("อัปเดตสต็อกสำเร็จ");
+      fetchProducts();
+    } else {
+      alert("เกิดข้อผิดพลาด: " + error.message);
+    }
+  };
+
   const handleDecideGroup = async (groupId, decision) => {
     const requests = groupedRequests[groupId];
     try {
       for (const req of requests) {
         if (decision === 'approved') {
-          const item = products.find(p => p.id === req.product_id);
+          const item = products.find(p => p.id == req.product_id);
           const newStock = req.type === 'withdraw' ? item.stock - req.amount : item.stock + req.amount;
           
           await supabase.from('products').update({ stock: newStock }).eq('id', req.product_id);
@@ -94,7 +106,7 @@ export default function Home() {
 
   const handleConfirmAction = async () => {
     if (!borrower || Object.keys(cart).length === 0) return alert("กรุณาเลือกของก่อน!");
-    const groupId = `GRP-${Date.now()}`; // สร้าง ID กลุ่มจากเวลา
+    const groupId = `GRP-${Date.now()}`;
     try {
       const inserts = Object.entries(cart).map(([itemId, qty]) => {
         const item = products.find(p => p.id == itemId);
@@ -112,8 +124,8 @@ export default function Home() {
     }
   };
 
-  // ... (ฟังก์ชันอื่นๆ เหมือนเดิม: handleLogout, updateCart, filteredProducts) ...
   const handleLogout = async () => { await supabase.auth.signOut(); router.push('/login'); };
+  
   const updateCart = (itemId, amount) => {
     const item = products.find(p => p.id == itemId);
     const currentQtyInCart = cart[itemId] || 0;
@@ -122,6 +134,7 @@ export default function Home() {
     if (mode === "return" && item.stock + newQty > (item.max_stock || 50)) return alert(`เกินจำนวนสูงสุด`);
     setCart(prev => (newQty <= 0 ? (({ [itemId]: _, ...r }) => r)(prev) : { ...prev, [itemId]: newQty }));
   };
+
   const filteredProducts = products.filter(item => item.name.toLowerCase().includes(searchTerm.toLowerCase()) && (activeCategory === "All" || item.category === activeCategory));
 
   if (!user) return null;
@@ -174,15 +187,17 @@ export default function Home() {
             </div>
           )}
 
-          {/* Search & Modes & Categories เหมือนเดิม */}
+          {/* Search & Modes */}
           <div className="relative mb-6">
             <input type="text" placeholder="ค้นหาอุปกรณ์..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full p-5 pl-14 bg-white border border-slate-200 rounded-3xl shadow-sm outline-none font-bold" />
             <span className="absolute left-6 top-1/2 -translate-y-1/2 opacity-30 text-xl">🔍</span>
           </div>
+
           <div className="flex bg-white p-1.5 rounded-2xl border border-slate-200 mb-8 shadow-sm">
             <button onClick={() => {setMode("withdraw"); setCart({});}} className={`flex-1 py-4 rounded-xl font-black text-sm transition-all ${mode === 'withdraw' ? 'bg-slate-900 text-white' : 'text-slate-400'}`}>เบิกของ</button>
             <button onClick={() => {setMode("return"); setCart({});}} className={`flex-1 py-4 rounded-xl font-black text-sm transition-all ${mode === 'return' ? 'bg-blue-600 text-white' : 'text-slate-400'}`}>คืนของ</button>
           </div>
+
           <div className="mb-8">
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 ml-1">Categories</p>
             <div className="flex gap-2 overflow-x-auto pb-4 no-scrollbar">
@@ -193,17 +208,28 @@ export default function Home() {
               ))}
             </div>
           </div>
+
+          {/* รายการสินค้า */}
           <div className="grid grid-cols-1 gap-4">
             {loading ? <div className="text-center py-20 animate-spin">🌀</div> : filteredProducts.map((item) => (
               <div key={item.id} className="group relative">
                 <ItemCard item={item} quantityInCart={cart[item.id] || 0} onUpdate={updateCart} mode={mode} />
+                {/* ปุ่ม SET STOCK ที่กลับมาทำงานได้ปกติสำหรับ Admin */}
+                {isAdmin && (
+                  <button onClick={() => {
+                    const n = prompt(`แก้ไขสต็อก: ${item.name}`, item.stock);
+                    if (n !== null) handleAdminUpdateStock(item.id, n);
+                  }} className="absolute top-4 right-4 z-20 bg-white/90 text-[9px] font-black px-3 py-1.5 rounded-xl border border-slate-200 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm">
+                    SET STOCK
+                  </button>
+                )}
               </div>
             ))}
           </div>
         </div>
       </div>
 
-      {/* Sidebar ตะกร้า เหมือนเดิม */}
+      {/* Sidebar ตะกร้า */}
       <div className="w-full lg:w-96 bg-white border-l p-8 flex flex-col shadow-2xl sticky lg:top-0 h-fit lg:h-screen">
         <h2 className="text-2xl font-black text-slate-800 mb-8 flex items-center gap-3">🛒 ตะกร้าของ{mode === 'withdraw' ? 'เบิก' : 'คืน'}</h2>
         <div className="flex-1 overflow-y-auto space-y-4">
