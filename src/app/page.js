@@ -150,18 +150,17 @@ export default function Home() {
     <main className="min-h-screen bg-[#F8FAFC] flex flex-col lg:flex-row font-sans text-slate-900">
       <div className="flex-1 p-4 lg:p-10">
         <div className="max-w-3xl mx-auto">
-          {/* Header - เวอร์ชัน Hybrid Logo (ตัว M + รูปภาพ) */}
+          
+          {/* Header - เวอร์ชันแก้ไขปัญหาโลโก้สี่เหลี่ยมขาว */}
           <div className="flex justify-between items-center mb-8 bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
             <div className="flex items-center gap-4">
-              <div className="relative w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-black text-2xl shadow-lg ring-4 ring-blue-50 overflow-hidden">
-                {/* เลเยอร์ล่าง: ตัว M สีขาว (จะแสดงผลถ้าไม่มีรูป หรือรูปใส) */}
-                <span className="absolute select-none">M</span>
-                
-                {/* เลเยอร์บน: ไฟล์ logo.png (ถ้าโหลดไม่สำเร็จจะหายไปเอง) */}
+              {/* Logo Container: ถ้าพื้นหลังขาว ให้เปลี่ยน bg-blue-600 เป็น bg-white เพื่อให้เนียนไปกับรูป */}
+              <div className="relative w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg overflow-hidden">
+                <span className="absolute text-white font-black text-2xl z-0">M</span>
                 <img 
                   src="/logo.png" 
                   alt="" 
-                  className="absolute inset-0 w-full h-full object-contain p-2 z-10"
+                  className="absolute inset-0 w-full h-full object-contain z-10"
                   onError={(e) => { e.target.style.display = 'none'; }} 
                 />
               </div>
@@ -176,28 +175,28 @@ export default function Home() {
             <button onClick={() => supabase.auth.signOut().then(() => router.push('/login'))} className="bg-slate-100 hover:bg-slate-200 text-slate-900 px-5 py-2.5 rounded-xl text-xs font-black transition-all active:scale-95">LOGOUT</button>
           </div>
 
-          {/* Admin Section: Requests (Scrollable) */}
+          {/* Admin Requests */}
           {isAdmin && Object.keys(groupedRequests).length > 0 && (
             <div className="mb-10">
-              <h2 className="text-sm font-black mb-4 uppercase text-blue-600 flex items-center gap-2">🔔 คำขอรอนุมัติ ({Object.keys(groupedRequests).length})</h2>
+              <h2 className="text-sm font-black mb-4 uppercase text-blue-600">🔔 คำขอรอนุมัติ ({Object.keys(groupedRequests).length})</h2>
               <div className="max-h-[500px] overflow-y-auto pr-2 space-y-6">
                 {Object.entries(groupedRequests).map(([groupId, items]) => (
                   <div key={groupId} className="bg-white border-l-8 border-l-blue-600 p-8 rounded-[2.5rem] shadow-xl border border-slate-100">
-                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                    <div className="flex justify-between items-center mb-6">
                       <div>
-                        <h3 className="font-black text-slate-800 text-lg uppercase tracking-tighter">ใบเบิก/คืน #{groupId.slice(-5)}</h3>
-                        <p className="text-xs font-bold text-slate-400">โดย: {items[0].borrower_name}</p>
+                        <h3 className="font-black text-slate-800 uppercase text-lg">ใบเบิก/คืน #{groupId.slice(-5)}</h3>
+                        <p className="text-xs font-bold text-slate-400">จาก: {items[0].borrower_name}</p>
                       </div>
                       <div className="flex gap-2">
-                        <button onClick={() => handleDecideGroup(groupId, 'approved')} className="bg-blue-600 text-white px-8 py-3 rounded-xl text-xs font-black shadow-lg active:scale-95 transition-all">อนุมัติ</button>
-                        <button onClick={() => handleDecideGroup(groupId, 'rejected')} className="bg-white text-red-500 border border-red-50 px-8 py-3 rounded-xl text-xs font-black active:scale-95 transition-all">ปฏิเสธ</button>
+                        <button onClick={() => handleDecideGroup(groupId, 'approved')} className="bg-blue-600 text-white px-8 py-3 rounded-xl text-xs font-black active:scale-95">อนุมัติ</button>
+                        <button onClick={() => handleDecideGroup(groupId, 'rejected')} className="bg-white text-red-500 border border-red-50 px-8 py-3 rounded-xl text-xs font-black active:scale-95">ปฏิเสธ</button>
                       </div>
                     </div>
                     <div className="space-y-2 border-t pt-4">
                       {items.map(item => (
                         <div key={item.id} className="flex justify-between text-sm font-bold text-slate-600 bg-slate-50 p-3 rounded-xl">
                           <span>{item.product_name}</span>
-                          <span className="text-blue-600 font-black">x{item.amount}</span>
+                          <span className="text-blue-600">x{item.amount}</span>
                         </div>
                       ))}
                     </div>
@@ -207,13 +206,13 @@ export default function Home() {
             </div>
           )}
 
-          {/* User Section: Status & Items */}
+          {/* User Pending/Holding */}
           {!isAdmin && (
             <>
               {myPendingRequests.length > 0 && (
-                <div className="mb-10 bg-blue-50 p-6 rounded-[2rem] border border-blue-100 shadow-inner">
-                  <h2 className="text-[10px] font-black mb-3 uppercase text-blue-600 tracking-widest text-center">⏳ รายการที่รออนุมัติ</h2>
-                  <div className="flex flex-wrap gap-2 justify-center">
+                <div className="mb-10 bg-blue-50 p-6 rounded-[2rem] border border-blue-100">
+                  <h2 className="text-[10px] font-black mb-3 uppercase text-blue-600 tracking-widest">⏳ รายการที่รออนุมัติ</h2>
+                  <div className="flex flex-wrap gap-2">
                     {myPendingRequests.map((req, idx) => (
                       <div key={idx} className="bg-white px-4 py-2 rounded-xl shadow-sm border border-blue-200 text-[10px] font-bold">
                         <span className={req.type === 'withdraw' ? 'text-amber-600' : 'text-blue-600'}>{req.type === 'withdraw' ? 'เบิก' : 'คืน'}</span> : {req.product_name} x{req.amount}
@@ -238,8 +237,8 @@ export default function Home() {
             </>
           )}
 
-          {/* UI Controls */}
-          <input type="text" placeholder="ค้นหาอุปกรณ์..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full p-5 bg-white border border-slate-200 rounded-3xl shadow-sm outline-none font-bold mb-6 focus:ring-4 focus:ring-blue-50 transition-all" />
+          {/* Controls */}
+          <input type="text" placeholder="ค้นหาอุปกรณ์..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full p-5 bg-white border border-slate-200 rounded-3xl shadow-sm outline-none font-bold mb-6" />
           
           <div className="flex bg-white p-1.5 rounded-2xl border border-slate-200 mb-8 shadow-sm">
             <button onClick={() => {setMode("withdraw"); setCart({});}} className={`flex-1 py-4 rounded-xl font-black text-sm transition-all ${mode === 'withdraw' ? 'bg-slate-900 text-white' : 'text-slate-400'}`}>เบิกของ</button>
@@ -248,11 +247,10 @@ export default function Home() {
 
           <div className="flex gap-2 mb-8 overflow-x-auto pb-2 no-scrollbar">
             {categories.map((cat) => (
-              <button key={cat} onClick={() => setActiveCategory(cat)} className={`px-6 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest border transition-all whitespace-nowrap ${activeCategory === cat ? 'bg-blue-600 text-white border-blue-600 shadow-md' : 'bg-white text-slate-400 border-slate-100 hover:border-slate-300'}`}>{cat}</button>
+              <button key={cat} onClick={() => setActiveCategory(cat)} className={`px-6 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest border transition-all whitespace-nowrap ${activeCategory === cat ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-400 border-slate-100'}`}>{cat}</button>
             ))}
           </div>
 
-          {/* List Products */}
           <div className="grid grid-cols-1 gap-4 pb-20">
             {loading ? <div className="text-center py-20 animate-pulse text-blue-600 font-black">LOADING...</div> : filteredProducts.map((item) => (
               <div key={item.id} className="group relative">
@@ -279,9 +277,8 @@ export default function Home() {
               <div className="bg-white px-4 py-2 rounded-xl border border-slate-200 font-black text-blue-600">{qty}</div>
             </div>
           ))}
-          {Object.keys(cart).length === 0 && <p className="text-center text-slate-300 font-bold py-10 italic text-sm">ไม่มีรายการในตะกร้า</p>}
         </div>
-        <button onClick={handleConfirmAction} disabled={Object.keys(cart).length === 0} className={`w-full py-5 rounded-[2rem] font-black text-white text-lg mt-8 shadow-2xl active:scale-95 transition-all ${Object.keys(cart).length === 0 ? 'bg-slate-100 text-slate-300 cursor-not-allowed' : mode === 'withdraw' ? 'bg-slate-900' : 'bg-blue-600'}`}>CONFIRM</button>
+        <button onClick={handleConfirmAction} disabled={Object.keys(cart).length === 0} className={`w-full py-5 rounded-[2rem] font-black text-white text-lg mt-8 shadow-2xl active:scale-95 transition-all ${Object.keys(cart).length === 0 ? 'bg-slate-100 text-slate-200' : mode === 'withdraw' ? 'bg-slate-900' : 'bg-blue-600'}`}>CONFIRM</button>
       </div>
     </main>
   );
