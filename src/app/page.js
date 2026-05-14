@@ -36,11 +36,7 @@ export default function Home() {
       }
     };
     checkUser();
-    
-    // Auto-refresh ทุก 10 วินาที
-    const interval = setInterval(() => {
-      if (user) fetchData(user.email, isAdmin);
-    }, 10000);
+    const interval = setInterval(() => { if (user) fetchData(user.email, isAdmin); }, 10000);
     return () => clearInterval(interval);
   }, [user, isAdmin]);
 
@@ -141,7 +137,7 @@ export default function Home() {
     await supabase.from('borrow_requests').insert(inserts);
     setCart({});
     fetchMyPendingRequests(user.email);
-    alert("ส่งคำขอแล้ว! รอแอดมินอนุมัติ");
+    alert("ส่งคำขอแล้ว!");
   };
 
   const filteredProducts = products.filter(item => 
@@ -155,33 +151,36 @@ export default function Home() {
     <main className="min-h-screen bg-[#F8FAFC] flex flex-col lg:flex-row font-sans text-slate-900">
       <div className="flex-1 p-4 lg:p-10">
         <div className="max-w-3xl mx-auto">
-          {/* Header */}
+          {/* Header พร้อมโลโก้ที่แก้ไขแล้ว */}
           <div className="flex justify-between items-center mb-8 bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-black text-xl shadow-lg">M</div>
+              <div className="relative w-14 h-14 bg-gradient-to-br from-blue-600 to-blue-700 rounded-2xl flex items-center justify-center text-white font-black text-2xl shadow-lg ring-4 ring-blue-50">
+                <img src="/logo.png" alt="" className="absolute inset-0 w-full h-full object-contain rounded-2xl" onError={(e) => e.target.style.display = 'none'} />
+                M
+              </div>
               <div>
-                <h1 className="text-xl font-black uppercase">Maker<span className="text-blue-600">Stock</span></h1>
-                <p className="text-[9px] font-bold text-slate-400">{user?.email} ({isAdmin ? 'ADMIN' : 'USER'})</p>
+                <h1 className="text-xl font-black tracking-tighter uppercase">Maker<span className="text-blue-600">Stock</span></h1>
+                <p className="text-[9px] font-bold text-slate-400 leading-tight">{user?.email} ({isAdmin ? 'ADMIN' : 'USER'})</p>
               </div>
             </div>
-            <button onClick={() => supabase.auth.signOut().then(() => router.push('/login'))} className="bg-slate-900 text-white px-5 py-2.5 rounded-xl text-xs font-black shadow-md active:scale-95 transition-all">LOGOUT</button>
+            <button onClick={() => supabase.auth.signOut().then(() => router.push('/login'))} className="bg-slate-900 text-white px-5 py-2.5 rounded-xl text-xs font-black active:scale-95 transition-all">LOGOUT</button>
           </div>
 
-          {/* Admin Section: คำขอรอนุมัติ (แบบ Card ใหญ่ เลื่อนได้) */}
+          {/* Admin Requests (Scrollable) */}
           {isAdmin && Object.keys(groupedRequests).length > 0 && (
             <div className="mb-10">
-              <h2 className="text-sm font-black mb-4 uppercase text-blue-600 flex items-center gap-2">🔔 คำขอรอนุมัติ ({Object.keys(groupedRequests).length})</h2>
-              <div className="max-h-[500px] overflow-y-auto pr-2 space-y-6 custom-scrollbar">
+              <h2 className="text-sm font-black mb-4 uppercase text-blue-600">🔔 คำขอรอนุมัติ ({Object.keys(groupedRequests).length})</h2>
+              <div className="max-h-[500px] overflow-y-auto pr-2 space-y-6">
                 {Object.entries(groupedRequests).map(([groupId, items]) => (
                   <div key={groupId} className="bg-white border-l-8 border-l-blue-600 p-8 rounded-[2.5rem] shadow-xl border border-slate-100">
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                       <div>
-                        <h3 className="font-black text-slate-800 text-lg uppercase tracking-tighter">ใบเบิก/คืน #{groupId.slice(-5)}</h3>
+                        <h3 className="font-black text-slate-800 text-lg uppercase">ใบเบิก/คืน #{groupId.slice(-5)}</h3>
                         <p className="text-xs font-bold text-slate-400">โดย: {items[0].borrower_name}</p>
                       </div>
                       <div className="flex gap-2">
-                        <button onClick={() => handleDecideGroup(groupId, 'approved')} className="bg-blue-600 text-white px-8 py-3 rounded-xl text-xs font-black shadow-lg active:scale-95">อนุมัติ</button>
-                        <button onClick={() => handleDecideGroup(groupId, 'rejected')} className="bg-white text-red-500 border border-red-50 px-8 py-3 rounded-xl text-xs font-black active:scale-95">ปฏิเสธ</button>
+                        <button onClick={() => handleDecideGroup(groupId, 'approved')} className="bg-blue-600 text-white px-8 py-3 rounded-xl text-xs font-black active:scale-95 transition-all">อนุมัติ</button>
+                        <button onClick={() => handleDecideGroup(groupId, 'rejected')} className="bg-white text-red-500 border border-red-50 px-8 py-3 rounded-xl text-xs font-black active:scale-95 transition-all">ปฏิเสธ</button>
                       </div>
                     </div>
                     <div className="space-y-2 border-t pt-4">
@@ -198,60 +197,58 @@ export default function Home() {
             </div>
           )}
 
-          {/* User Section: สถานะคำขอกำลังส่ง */}
-          {!isAdmin && myPendingRequests.length > 0 && (
-            <div className="mb-10 bg-blue-50 p-6 rounded-[2rem] border border-blue-100 shadow-inner">
-              <h2 className="text-[10px] font-black mb-3 uppercase text-blue-600 tracking-widest">⏳ รายการที่กำลังรออนุมัติ</h2>
-              <div className="flex flex-wrap gap-2">
-                {myPendingRequests.map((req, idx) => (
-                  <div key={idx} className="bg-white px-4 py-2 rounded-xl shadow-sm border border-blue-200 text-[10px] font-bold">
-                    <span className={req.type === 'withdraw' ? 'text-amber-600' : 'text-blue-600'}>{req.type === 'withdraw' ? 'เบิก' : 'คืน'}</span> : {req.product_name} x{req.amount}
+          {/* User Pending & Items */}
+          {!isAdmin && (
+            <>
+              {myPendingRequests.length > 0 && (
+                <div className="mb-10 bg-blue-50 p-6 rounded-[2rem] border border-blue-100 shadow-inner">
+                  <h2 className="text-[10px] font-black mb-3 uppercase text-blue-600 tracking-widest">⏳ รายการที่กำลังรออนุมัติ</h2>
+                  <div className="flex flex-wrap gap-2">
+                    {myPendingRequests.map((req, idx) => (
+                      <div key={idx} className="bg-white px-4 py-2 rounded-xl shadow-sm border border-blue-200 text-[10px] font-bold">
+                        <span className={req.type === 'withdraw' ? 'text-amber-600' : 'text-blue-600'}>{req.type === 'withdraw' ? 'เบิก' : 'คืน'}</span> : {req.product_name} x{req.amount}
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            </div>
+                </div>
+              )}
+              {myItems.length > 0 && (
+                <div className="mb-10 bg-slate-900 p-8 rounded-[2.5rem] shadow-xl text-white">
+                  <h2 className="text-[10px] font-black mb-4 uppercase text-slate-400 tracking-widest text-center">📦 ของที่คุณถือครองอยู่</h2>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    {myItems.map((item, idx) => (
+                      <div key={idx} className="bg-white/10 p-4 rounded-2xl border border-white/10 text-center">
+                        <p className="font-black text-xs truncate">{item.name}</p>
+                        <p className="text-blue-400 font-black text-xl">x{item.qty}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
           )}
 
-          {/* User Section: อุปกรณ์ในมือ */}
-          {!isAdmin && myItems.length > 0 && (
-            <div className="mb-10 bg-slate-900 p-8 rounded-[2.5rem] shadow-xl text-white">
-              <h2 className="text-[10px] font-black mb-4 uppercase text-slate-400 tracking-widest">📦 อุปกรณ์ที่คุณถือครองอยู่</h2>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                {myItems.map((item, idx) => (
-                  <div key={idx} className="bg-white/10 p-4 rounded-2xl border border-white/10">
-                    <p className="font-black text-xs truncate">{item.name}</p>
-                    <p className="text-blue-400 font-black text-xl">x{item.qty}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* ค้นหาและหมวดหมู่ */}
-          <div className="relative mb-6">
-            <input type="text" placeholder="ค้นหาอุปกรณ์..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full p-5 pl-14 bg-white border border-slate-200 rounded-3xl shadow-sm outline-none font-bold focus:ring-4 focus:ring-blue-50" />
-            <span className="absolute left-6 top-1/2 -translate-y-1/2 opacity-30 text-xl">🔍</span>
-          </div>
-
+          {/* Search, Modes, Categories */}
+          <input type="text" placeholder="ค้นหาอุปกรณ์..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full p-5 bg-white border border-slate-200 rounded-3xl shadow-sm outline-none font-bold mb-6" />
+          
           <div className="flex bg-white p-1.5 rounded-2xl border border-slate-200 mb-8 shadow-sm">
-            <button onClick={() => {setMode("withdraw"); setCart({});}} className={`flex-1 py-4 rounded-xl font-black text-sm transition-all ${mode === 'withdraw' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400'}`}>เบิกของ</button>
-            <button onClick={() => {setMode("return"); setCart({});}} className={`flex-1 py-4 rounded-xl font-black text-sm transition-all ${mode === 'return' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400'}`}>คืนของ</button>
+            <button onClick={() => {setMode("withdraw"); setCart({});}} className={`flex-1 py-4 rounded-xl font-black text-sm transition-all ${mode === 'withdraw' ? 'bg-slate-900 text-white' : 'text-slate-400'}`}>เบิกของ</button>
+            <button onClick={() => {setMode("return"); setCart({});}} className={`flex-1 py-4 rounded-xl font-black text-sm transition-all ${mode === 'return' ? 'bg-blue-600 text-white' : 'text-slate-400'}`}>คืนของ</button>
           </div>
 
-          {/* แถบหมวดหมู่ */}
           <div className="flex gap-2 mb-8 overflow-x-auto pb-2 no-scrollbar">
             {categories.map((cat) => (
               <button key={cat} onClick={() => setActiveCategory(cat)} className={`px-6 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest border transition-all whitespace-nowrap ${activeCategory === cat ? 'bg-blue-600 text-white border-blue-600 shadow-md' : 'bg-white text-slate-400 border-slate-100 hover:border-slate-300'}`}>{cat}</button>
             ))}
           </div>
 
-          {/* รายการสินค้า */}
+          {/* Products */}
           <div className="grid grid-cols-1 gap-4">
             {loading ? <div className="text-center py-20 animate-spin text-2xl text-blue-600">🌀</div> : filteredProducts.map((item) => (
               <div key={item.id} className="group relative">
                 <ItemCard item={item} quantityInCart={cart[item.id] || 0} onUpdate={updateCart} mode={mode} />
                 {isAdmin && (
-                  <button onClick={() => { const n = prompt(`แก้ไขสต็อก: ${item.name}`, item.stock); if (n !== null) handleAdminUpdateStock(item.id, n); }} className="absolute top-4 right-4 z-20 bg-white/90 text-[9px] font-black px-3 py-1.5 rounded-xl border border-slate-200 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm">SET STOCK</button>
+                  <button onClick={() => { const n = prompt(`แก้ไขสต็อก: ${item.name}`, item.stock); if (n !== null) handleAdminUpdateStock(item.id, n); }} className="absolute top-4 right-4 z-20 bg-white/90 text-[9px] font-black px-3 py-1.5 rounded-xl border border-slate-200 opacity-0 group-hover:opacity-100 shadow-sm">SET STOCK</button>
                 )}
               </div>
             ))}
@@ -273,7 +270,7 @@ export default function Home() {
             </div>
           ))}
         </div>
-        <button onClick={handleConfirmAction} disabled={Object.keys(cart).length === 0} className={`w-full py-5 rounded-[2rem] font-black text-white text-lg mt-8 shadow-2xl active:scale-95 transition-all ${mode === 'withdraw' ? 'bg-slate-900' : 'bg-blue-600'}`}>CONFIRM ACTION</button>
+        <button onClick={handleConfirmAction} disabled={Object.keys(cart).length === 0} className={`w-full py-5 rounded-[2rem] font-black text-white text-lg mt-8 shadow-2xl active:scale-95 transition-all ${mode === 'withdraw' ? 'bg-slate-900' : 'bg-blue-600'}`}>CONFIRM</button>
       </div>
     </main>
   );
