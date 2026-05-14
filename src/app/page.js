@@ -18,6 +18,8 @@ export default function Home() {
   const [groupedRequests, setGroupedRequests] = useState({}); 
   const [myPendingRequests, setMyPendingRequests] = useState([]);
   const [myItems, setMyItems] = useState([]);
+  const [history, setHistory] = useState([]); // เก็บข้อมูลประวัติ
+  const [showHistory, setShowHistory] = useState(false); // ควบคุมการเปิด/ปิด Modal ประวัติ
   const router = useRouter();
 
   const ADMIN_EMAILS = ["admin@email.com", "your-email@email.com"]; 
@@ -44,6 +46,7 @@ export default function Home() {
     fetchProducts();
     fetchMyBorrowedItems(email);
     fetchMyPendingRequests(email);
+    fetchUserHistory(email); // ดึงประวัติการทำรายการ
     if (adminStatus) fetchAdminRequests();
   };
 
@@ -54,6 +57,15 @@ export default function Home() {
       setCategories(["All", ...new Set(data.map(item => item.category).filter(Boolean))]);
     }
     setLoading(false);
+  };
+
+  const fetchUserHistory = async (email) => {
+    const { data } = await supabase
+      .from('transaction_logs')
+      .select('*')
+      .eq('borrower_name', email)
+      .order('created_at', { ascending: false });
+    if (data) setHistory(data);
   };
 
   const fetchMyBorrowedItems = async (email) => {
@@ -151,7 +163,7 @@ export default function Home() {
       <div className="flex-1 p-4 lg:p-10">
         <div className="max-w-3xl mx-auto">
           
-          {/* Header - แก้ไขจุดนี้: เอา bg-blue-600 และกรอบน้ำเงินออกทั้งหมด */}
+          {/* Header */}
           <div className="flex justify-between items-center mb-8 bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
             <div className="flex items-center gap-4">
               <div className="w-14 h-14 flex items-center justify-center overflow-hidden">
@@ -176,10 +188,48 @@ export default function Home() {
                 </div>
               </div>
             </div>
-            <button onClick={() => supabase.auth.signOut().then(() => router.push('/login'))} className="bg-slate-100 hover:bg-slate-200 text-slate-900 px-5 py-2.5 rounded-xl text-xs font-black transition-all active:scale-95">LOGOUT</button>
+            <div className="flex gap-2">
+              <button onClick={() => setShowHistory(true)} className="bg-blue-50 hover:bg-blue-100 text-blue-600 px-4 py-2.5 rounded-xl text-[10px] font-black transition-all">HISTORY</button>
+              <button onClick={() => supabase.auth.signOut().then(() => router.push('/login'))} className="bg-slate-100 hover:bg-slate-200 text-slate-900 px-4 py-2.5 rounded-xl text-[10px] font-black transition-all">LOGOUT</button>
+            </div>
           </div>
 
-          {/* Admin Requests */}
+          {/* History Modal */}
+          {showHistory && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+              <div className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl flex flex-col max-h-[85vh] overflow-hidden">
+                <div className="p-8 border-b flex justify-between items-center bg-slate-50">
+                  <h2 className="text-xl font-black uppercase tracking-tighter">Transaction History</h2>
+                  <button onClick={() => setShowHistory(false)} className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center font-black hover:bg-slate-100 transition-all">✕</button>
+                </div>
+                <div className="flex-1 overflow-y-auto p-6 space-y-3">
+                  {history.length > 0 ? history.map((log) => (
+                    <div key={log.id} className="bg-white border border-slate-100 p-5 rounded-2xl shadow-sm flex justify-between items-center group hover:border-blue-200 transition-all">
+                      <div className="flex flex-col">
+                        <span className="font-black text-slate-800 text-sm uppercase">{log.product_name}</span>
+                        <span className="text-[10px] font-bold text-slate-400">
+                          {new Date(log.created_at).toLocaleString('th-TH', { 
+                            day: '2-digit', month: '2-digit', year: 'numeric', 
+                            hour: '2-digit', minute: '2-digit' 
+                          })}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <span className={`text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest ${log.type === 'withdraw' ? 'bg-amber-100 text-amber-600' : 'bg-blue-100 text-blue-600'}`}>
+                          {log.type === 'withdraw' ? 'เบิก' : 'คืน'}
+                        </span>
+                        <span className="font-black text-lg text-slate-700">x{log.amount}</span>
+                      </div>
+                    </div>
+                  )) : (
+                    <div className="text-center py-20 text-slate-300 font-bold italic">ไม่พบประวัติการทำรายการ</div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Rest of UI (Admin Section, User Status, Items, etc. - ส่วนที่เหลือเหมือนเดิม) */}
           {isAdmin && Object.keys(groupedRequests).length > 0 && (
             <div className="mb-10">
               <h2 className="text-sm font-black mb-4 uppercase text-blue-600 flex items-center gap-2">🔔 คำขอรอนุมัติ ({Object.keys(groupedRequests).length})</h2>
@@ -192,7 +242,7 @@ export default function Home() {
                         <p className="text-xs font-bold text-slate-400">โดย: {items[0].borrower_name}</p>
                       </div>
                       <div className="flex gap-2">
-                        <button onClick={() => handleDecideGroup(groupId, 'approved')} className="bg-blue-600 text-white px-8 py-3 rounded-xl text-xs font-black active:scale-95 transition-all">อนุมัติ</button>
+                        <button onClick={() => handleDecideGroup(groupId, 'approved')} className="bg-blue-600 text-white px-8 py-3 rounded-xl text-xs font-black shadow-lg active:scale-95 transition-all">อนุมัติ</button>
                         <button onClick={() => handleDecideGroup(groupId, 'rejected')} className="bg-white text-red-500 border border-red-50 px-8 py-3 rounded-xl text-xs font-black active:scale-95 transition-all">ปฏิเสธ</button>
                       </div>
                     </div>
@@ -210,7 +260,6 @@ export default function Home() {
             </div>
           )}
 
-          {/* User Sections */}
           {!isAdmin && (
             <>
               {myPendingRequests.length > 0 && (
