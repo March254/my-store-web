@@ -19,7 +19,6 @@ export default function Home() {
   const [myItems, setMyItems] = useState([]);
   const router = useRouter();
 
-  // --- 1. กำหนด Email แอดมินตรงนี้ (เปลี่ยนเป็นเมลของคุณ) ---
   const ADMIN_EMAILS = ["admin@email.com", "your-email@email.com"]; 
 
   useEffect(() => {
@@ -131,9 +130,9 @@ export default function Home() {
         alert(`คุณคืนเกินจำนวนที่มี! (คุณถือครองอยู่ ${currentlyHolding} ชิ้น)`);
         return;
       }
-      const maxLimit = Math.max(item.stock, 100); 
+      const maxLimit = Math.max(item.stock, 500); 
       if (item.stock + newQty > maxLimit) {
-        alert(`สต็อกรวมจะเกินกำหนด`);
+        alert(`สต็อกรวมจะเกินกำหนด 500 ชิ้น`);
         return;
       }
     }
@@ -165,7 +164,12 @@ export default function Home() {
   };
 
   const handleLogout = async () => { await supabase.auth.signOut(); router.push('/login'); };
-  const filteredProducts = products.filter(item => item.name.toLowerCase().includes(searchTerm.toLowerCase()) && (activeCategory === "All" || item.category === activeCategory));
+  
+  // ปรับการ Filter ให้รองรับทั้ง Search และ Category
+  const filteredProducts = products.filter(item => 
+    item.name.toLowerCase().includes(searchTerm.toLowerCase()) && 
+    (activeCategory === "All" || item.category === activeCategory)
+  );
 
   if (!user) return null;
 
@@ -173,7 +177,7 @@ export default function Home() {
     <main className="min-h-screen bg-[#F8FAFC] flex flex-col lg:flex-row font-sans text-slate-900">
       <div className="flex-1 p-4 lg:p-10">
         <div className="max-w-3xl mx-auto">
-          {/* Header พร้อมโลโก้และชื่อ User */}
+          {/* Header */}
           <div className="flex justify-between items-center mb-8 bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
             <div className="flex items-center gap-4">
               <div className="relative w-14 h-14">
@@ -200,10 +204,10 @@ export default function Home() {
                 </div>
               </div>
             </div>
-            <button onClick={handleLogout} className="bg-slate-900 text-white px-5 py-2.5 rounded-xl text-xs font-black shadow-md">LOGOUT</button>
+            <button onClick={handleLogout} className="bg-slate-900 text-white px-5 py-2.5 rounded-xl text-xs font-black shadow-md transition-transform active:scale-95">LOGOUT</button>
           </div>
 
-          {/* อุปกรณ์ที่ถือครอง (User เท่านั้น) */}
+          {/* อุปกรณ์ที่ถือครอง */}
           {!isAdmin && myItems.length > 0 && (
             <div className="mb-10 bg-slate-900 p-8 rounded-[2.5rem] shadow-xl text-white">
               <h2 className="text-lg font-black mb-4 flex items-center gap-2">📦 อุปกรณ์ที่คุณถือครองอยู่</h2>
@@ -219,7 +223,7 @@ export default function Home() {
             </div>
           )}
 
-          {/* คำขอสำหรับ Admin */}
+          {/* Admin Requests */}
           {isAdmin && Object.keys(groupedRequests).length > 0 && (
             <div className="mb-10 space-y-6">
               {Object.entries(groupedRequests).map(([groupId, items]) => (
@@ -258,8 +262,25 @@ export default function Home() {
             <button onClick={() => {setMode("return"); setCart({});}} className={`flex-1 py-4 rounded-xl font-black text-sm transition-all ${mode === 'return' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400'}`}>คืนของ</button>
           </div>
 
+          {/* --- เพิ่มแถบหมวดหมู่ (Category Tabs) ตรงนี้ --- */}
+          <div className="flex gap-2 mb-8 overflow-x-auto pb-2 no-scrollbar">
+            {categories.map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setActiveCategory(cat)}
+                className={`px-6 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest border transition-all whitespace-nowrap ${
+                  activeCategory === cat 
+                    ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-100' 
+                    : 'bg-white text-slate-400 border-slate-100 hover:border-slate-300'
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+
           <div className="grid grid-cols-1 gap-4">
-            {loading ? <div className="text-center py-20 animate-spin">🌀</div> : filteredProducts.map((item) => (
+            {loading ? <div className="text-center py-20 animate-spin text-2xl text-blue-600">🌀</div> : filteredProducts.map((item) => (
               <div key={item.id} className="group relative">
                 <ItemCard item={item} quantityInCart={cart[item.id] || 0} onUpdate={updateCart} mode={mode} />
                 {isAdmin && (
