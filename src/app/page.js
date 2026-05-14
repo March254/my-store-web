@@ -109,7 +109,7 @@ export default function Home() {
         await supabase.from('borrow_requests').update({ status: decision }).eq('id', req.id);
       }
       fetchData(user.email, isAdmin);
-    } catch (e) { alert("Error updating request"); }
+    } catch (e) { alert("Error"); }
   };
 
   const updateCart = (itemId, amount) => {
@@ -119,7 +119,6 @@ export default function Home() {
     if (mode === "return") {
       const currentlyHolding = myItems.find(i => i.name === item.name)?.qty || 0;
       if (newQty > currentlyHolding) return alert("คืนเกินจำนวนที่มี");
-      if (item.stock + newQty > Math.max(item.stock, 500)) return alert("สต็อกรวมเกิน 500");
     }
     setCart(prev => {
       if (newQty <= 0) { const { [itemId]: _, ...rest } = prev; return rest; }
@@ -137,7 +136,7 @@ export default function Home() {
     await supabase.from('borrow_requests').insert(inserts);
     setCart({});
     fetchMyPendingRequests(user.email);
-    alert("ส่งคำขอแล้ว! โปรดรอแอดมินอนุมัติ");
+    alert("ส่งคำขอแล้ว!");
   };
 
   const filteredProducts = products.filter(item => 
@@ -149,14 +148,17 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-[#F8FAFC] flex flex-col lg:flex-row font-sans text-slate-900">
-      <div className="flex-1 p-4 lg:p-10 overflow-y-auto">
+      <div className="flex-1 p-4 lg:p-10">
         <div className="max-w-3xl mx-auto">
-          {/* Fixed Header with Hybrid Logo */}
+          {/* Header - เวอร์ชันใช้ไฟล์ logo.png 100% */}
           <div className="flex justify-between items-center mb-8 bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
             <div className="flex items-center gap-4">
-              <div className="relative w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-black text-2xl shadow-lg overflow-hidden">
-                <span className="absolute">M</span>
-                <img src="/logo.png" alt="" className="absolute inset-0 w-full h-full object-cover z-10" onError={(e) => { e.target.style.display = 'none'; }} />
+              <div className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg ring-4 ring-blue-50 overflow-hidden p-2">
+                <img 
+                  src="/logo.png" 
+                  alt="MakerStock Logo" 
+                  className="w-full h-full object-contain"
+                />
               </div>
               <div>
                 <h1 className="text-xl font-black tracking-tighter uppercase leading-none mb-1">Maker<span className="text-blue-600">Stock</span></h1>
@@ -169,17 +171,17 @@ export default function Home() {
             <button onClick={() => supabase.auth.signOut().then(() => router.push('/login'))} className="bg-slate-100 hover:bg-slate-200 text-slate-900 px-5 py-2.5 rounded-xl text-xs font-black transition-all active:scale-95">LOGOUT</button>
           </div>
 
-          {/* Admin Requests (Scrollable Card Style) */}
+          {/* Admin Section: Requests (Scrollable) */}
           {isAdmin && Object.keys(groupedRequests).length > 0 && (
             <div className="mb-10">
               <h2 className="text-sm font-black mb-4 uppercase text-blue-600 flex items-center gap-2">🔔 คำขอรอนุมัติ ({Object.keys(groupedRequests).length})</h2>
-              <div className="max-h-[500px] overflow-y-auto pr-2 space-y-6 scrollbar-hide" style={{ scrollbarWidth: 'none' }}>
+              <div className="max-h-[500px] overflow-y-auto pr-2 space-y-6">
                 {Object.entries(groupedRequests).map(([groupId, items]) => (
                   <div key={groupId} className="bg-white border-l-8 border-l-blue-600 p-8 rounded-[2.5rem] shadow-xl border border-slate-100">
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                       <div>
                         <h3 className="font-black text-slate-800 text-lg uppercase tracking-tighter">ใบเบิก/คืน #{groupId.slice(-5)}</h3>
-                        <p className="text-xs font-bold text-slate-400">ผู้ขอ: {items[0].borrower_name}</p>
+                        <p className="text-xs font-bold text-slate-400">โดย: {items[0].borrower_name}</p>
                       </div>
                       <div className="flex gap-2">
                         <button onClick={() => handleDecideGroup(groupId, 'approved')} className="bg-blue-600 text-white px-8 py-3 rounded-xl text-xs font-black shadow-lg active:scale-95 transition-all">อนุมัติ</button>
@@ -188,9 +190,9 @@ export default function Home() {
                     </div>
                     <div className="space-y-2 border-t pt-4">
                       {items.map(item => (
-                        <div key={item.id} className="flex justify-between text-sm font-bold text-slate-600 bg-slate-50 p-3 rounded-xl italic">
+                        <div key={item.id} className="flex justify-between text-sm font-bold text-slate-600 bg-slate-50 p-3 rounded-xl">
                           <span>{item.product_name}</span>
-                          <span className="text-blue-600">x{item.amount}</span>
+                          <span className="text-blue-600 font-black">x{item.amount}</span>
                         </div>
                       ))}
                     </div>
@@ -200,13 +202,13 @@ export default function Home() {
             </div>
           )}
 
-          {/* User Status: Pending & Items on hand */}
+          {/* User Section: Status & Items */}
           {!isAdmin && (
             <>
               {myPendingRequests.length > 0 && (
                 <div className="mb-10 bg-blue-50 p-6 rounded-[2rem] border border-blue-100 shadow-inner">
-                  <h2 className="text-[10px] font-black mb-3 uppercase text-blue-600 tracking-widest">⏳ รายการที่กำลังรออนุมัติ</h2>
-                  <div className="flex flex-wrap gap-2">
+                  <h2 className="text-[10px] font-black mb-3 uppercase text-blue-600 tracking-widest text-center">⏳ กำลังรออนุมัติ...</h2>
+                  <div className="flex flex-wrap gap-2 justify-center">
                     {myPendingRequests.map((req, idx) => (
                       <div key={idx} className="bg-white px-4 py-2 rounded-xl shadow-sm border border-blue-200 text-[10px] font-bold">
                         <span className={req.type === 'withdraw' ? 'text-amber-600' : 'text-blue-600'}>{req.type === 'withdraw' ? 'เบิก' : 'คืน'}</span> : {req.product_name} x{req.amount}
@@ -217,7 +219,7 @@ export default function Home() {
               )}
               {myItems.length > 0 && (
                 <div className="mb-10 bg-slate-900 p-8 rounded-[2.5rem] shadow-xl text-white">
-                  <h2 className="text-[10px] font-black mb-4 uppercase text-slate-400 tracking-widest text-center">📦 ของที่คุณถือครองอยู่</h2>
+                  <h2 className="text-[10px] font-black mb-4 uppercase text-slate-400 tracking-widest text-center italic">📦 อุปกรณ์ที่คุณถือครองอยู่</h2>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                     {myItems.map((item, idx) => (
                       <div key={idx} className="bg-white/10 p-4 rounded-2xl border border-white/10 text-center">
@@ -231,15 +233,12 @@ export default function Home() {
             </>
           )}
 
-          {/* Controls: Search, Modes, Categories */}
-          <div className="relative mb-6">
-            <input type="text" placeholder="ค้นหาอุปกรณ์..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full p-5 pl-14 bg-white border border-slate-200 rounded-3xl shadow-sm outline-none font-bold focus:ring-4 focus:ring-blue-50 transition-all" />
-            <span className="absolute left-6 top-1/2 -translate-y-1/2 opacity-30 text-xl">🔍</span>
-          </div>
-
+          {/* Search, Modes, Categories */}
+          <input type="text" placeholder="ค้นหาอุปกรณ์..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full p-5 bg-white border border-slate-200 rounded-3xl shadow-sm outline-none font-bold mb-6 focus:ring-4 focus:ring-blue-50" />
+          
           <div className="flex bg-white p-1.5 rounded-2xl border border-slate-200 mb-8 shadow-sm">
-            <button onClick={() => {setMode("withdraw"); setCart({});}} className={`flex-1 py-4 rounded-xl font-black text-sm transition-all ${mode === 'withdraw' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400'}`}>เบิกของ</button>
-            <button onClick={() => {setMode("return"); setCart({});}} className={`flex-1 py-4 rounded-xl font-black text-sm transition-all ${mode === 'return' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400'}`}>คืนของ</button>
+            <button onClick={() => {setMode("withdraw"); setCart({});}} className={`flex-1 py-4 rounded-xl font-black text-sm transition-all ${mode === 'withdraw' ? 'bg-slate-900 text-white' : 'text-slate-400'}`}>เบิกของ</button>
+            <button onClick={() => {setMode("return"); setCart({});}} className={`flex-1 py-4 rounded-xl font-black text-sm transition-all ${mode === 'return' ? 'bg-blue-600 text-white' : 'text-slate-400'}`}>คืนของ</button>
           </div>
 
           <div className="flex gap-2 mb-8 overflow-x-auto pb-2 no-scrollbar">
@@ -250,11 +249,11 @@ export default function Home() {
 
           {/* Products List */}
           <div className="grid grid-cols-1 gap-4 pb-20">
-            {loading ? <div className="text-center py-20 animate-pulse text-blue-600 font-black">LOADING PRODUCTS...</div> : filteredProducts.map((item) => (
+            {loading ? <div className="text-center py-20 font-black text-blue-600">LOADING...</div> : filteredProducts.map((item) => (
               <div key={item.id} className="group relative">
                 <ItemCard item={item} quantityInCart={cart[item.id] || 0} onUpdate={updateCart} mode={mode} />
                 {isAdmin && (
-                  <button onClick={() => { const n = prompt(`แก้ไขสต็อก: ${item.name}`, item.stock); if (n !== null) handleAdminUpdateStock(item.id, n); }} className="absolute top-4 right-4 z-20 bg-white/90 text-[9px] font-black px-3 py-1.5 rounded-xl border border-slate-200 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm active:scale-90">SET STOCK</button>
+                  <button onClick={() => { const n = prompt(`แก้ไขสต็อก: ${item.name}`, item.stock); if (n !== null) handleAdminUpdateStock(item.id, n); }} className="absolute top-4 right-4 z-20 bg-white/90 text-[9px] font-black px-3 py-1.5 rounded-xl border border-slate-200 opacity-0 group-hover:opacity-100 transition-all shadow-sm">SET STOCK</button>
                 )}
               </div>
             ))}
@@ -262,22 +261,22 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Cart Sidebar (Desktop) */}
+      {/* Cart Sidebar */}
       <div className="w-full lg:w-96 bg-white border-l p-8 flex flex-col shadow-2xl sticky lg:top-0 h-fit lg:h-screen">
         <h2 className="text-2xl font-black text-slate-800 mb-8 uppercase italic flex items-center gap-3">🛒 Cart <span className="text-blue-600">/</span> {mode}</h2>
-        <div className="flex-1 overflow-y-auto space-y-4 pr-2">
+        <div className="flex-1 overflow-y-auto space-y-4">
           {Object.entries(cart).map(([id, qty]) => (
-            <div key={id} className="flex justify-between items-center bg-slate-50 p-5 rounded-[1.8rem] border border-slate-100 animate-in fade-in slide-in-from-right-4 duration-300">
+            <div key={id} className="flex justify-between items-center bg-slate-50 p-5 rounded-[1.8rem] border border-slate-100 animate-in fade-in slide-in-from-right-4">
               <div className="min-w-0 pr-4">
                 <p className="font-black text-slate-800 truncate text-sm">{products.find(p => p.id == id)?.name}</p>
                 <p className="text-[9px] text-blue-500 font-black uppercase tracking-widest">{products.find(p => p.id == id)?.category}</p>
               </div>
-              <div className="bg-white px-4 py-2 rounded-xl border border-slate-200 font-black text-blue-600 shadow-sm">{qty}</div>
+              <div className="bg-white px-4 py-2 rounded-xl border border-slate-200 font-black text-blue-600">{qty}</div>
             </div>
           ))}
-          {Object.keys(cart).length === 0 && <p className="text-center text-slate-300 font-bold py-10 italic">Your cart is empty</p>}
+          {Object.keys(cart).length === 0 && <p className="text-center text-slate-300 font-bold py-10 italic">Cart is empty</p>}
         </div>
-        <button onClick={handleConfirmAction} disabled={Object.keys(cart).length === 0} className={`w-full py-5 rounded-[2rem] font-black text-white text-lg mt-8 shadow-2xl active:scale-95 transition-all ${Object.keys(cart).length === 0 ? 'bg-slate-200 cursor-not-allowed' : mode === 'withdraw' ? 'bg-slate-900' : 'bg-blue-600'}`}>CONFIRM REQUEST</button>
+        <button onClick={handleConfirmAction} disabled={Object.keys(cart).length === 0} className={`w-full py-5 rounded-[2rem] font-black text-white text-lg mt-8 shadow-2xl active:scale-95 transition-all ${Object.keys(cart).length === 0 ? 'bg-slate-100 text-slate-200' : mode === 'withdraw' ? 'bg-slate-900' : 'bg-blue-600'}`}>CONFIRM</button>
       </div>
     </main>
   );
