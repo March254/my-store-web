@@ -150,14 +150,19 @@ export default function Home() {
     <main className="min-h-screen bg-[#F8FAFC] flex flex-col lg:flex-row font-sans text-slate-900">
       <div className="flex-1 p-4 lg:p-10">
         <div className="max-w-3xl mx-auto">
-          {/* Header - เวอร์ชันใช้ไฟล์ logo.png 100% */}
+          {/* Header - เวอร์ชัน Hybrid Logo (ตัว M + รูปภาพ) */}
           <div className="flex justify-between items-center mb-8 bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
             <div className="flex items-center gap-4">
-              <div className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg ring-4 ring-blue-50 overflow-hidden p-2">
+              <div className="relative w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-black text-2xl shadow-lg ring-4 ring-blue-50 overflow-hidden">
+                {/* เลเยอร์ล่าง: ตัว M สีขาว (จะแสดงผลถ้าไม่มีรูป หรือรูปใส) */}
+                <span className="absolute select-none">M</span>
+                
+                {/* เลเยอร์บน: ไฟล์ logo.png (ถ้าโหลดไม่สำเร็จจะหายไปเอง) */}
                 <img 
                   src="/logo.png" 
-                  alt="MakerStock Logo" 
-                  className="w-full h-full object-contain"
+                  alt="" 
+                  className="absolute inset-0 w-full h-full object-contain p-2 z-10"
+                  onError={(e) => { e.target.style.display = 'none'; }} 
                 />
               </div>
               <div>
@@ -207,7 +212,7 @@ export default function Home() {
             <>
               {myPendingRequests.length > 0 && (
                 <div className="mb-10 bg-blue-50 p-6 rounded-[2rem] border border-blue-100 shadow-inner">
-                  <h2 className="text-[10px] font-black mb-3 uppercase text-blue-600 tracking-widest text-center">⏳ กำลังรออนุมัติ...</h2>
+                  <h2 className="text-[10px] font-black mb-3 uppercase text-blue-600 tracking-widest text-center">⏳ รายการที่รออนุมัติ</h2>
                   <div className="flex flex-wrap gap-2 justify-center">
                     {myPendingRequests.map((req, idx) => (
                       <div key={idx} className="bg-white px-4 py-2 rounded-xl shadow-sm border border-blue-200 text-[10px] font-bold">
@@ -219,7 +224,7 @@ export default function Home() {
               )}
               {myItems.length > 0 && (
                 <div className="mb-10 bg-slate-900 p-8 rounded-[2.5rem] shadow-xl text-white">
-                  <h2 className="text-[10px] font-black mb-4 uppercase text-slate-400 tracking-widest text-center italic">📦 อุปกรณ์ที่คุณถือครองอยู่</h2>
+                  <h2 className="text-[10px] font-black mb-4 uppercase text-slate-400 tracking-widest text-center">📦 ของที่คุณถือครองอยู่</h2>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                     {myItems.map((item, idx) => (
                       <div key={idx} className="bg-white/10 p-4 rounded-2xl border border-white/10 text-center">
@@ -233,8 +238,8 @@ export default function Home() {
             </>
           )}
 
-          {/* Search, Modes, Categories */}
-          <input type="text" placeholder="ค้นหาอุปกรณ์..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full p-5 bg-white border border-slate-200 rounded-3xl shadow-sm outline-none font-bold mb-6 focus:ring-4 focus:ring-blue-50" />
+          {/* UI Controls */}
+          <input type="text" placeholder="ค้นหาอุปกรณ์..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full p-5 bg-white border border-slate-200 rounded-3xl shadow-sm outline-none font-bold mb-6 focus:ring-4 focus:ring-blue-50 transition-all" />
           
           <div className="flex bg-white p-1.5 rounded-2xl border border-slate-200 mb-8 shadow-sm">
             <button onClick={() => {setMode("withdraw"); setCart({});}} className={`flex-1 py-4 rounded-xl font-black text-sm transition-all ${mode === 'withdraw' ? 'bg-slate-900 text-white' : 'text-slate-400'}`}>เบิกของ</button>
@@ -247,9 +252,9 @@ export default function Home() {
             ))}
           </div>
 
-          {/* Products List */}
+          {/* List Products */}
           <div className="grid grid-cols-1 gap-4 pb-20">
-            {loading ? <div className="text-center py-20 font-black text-blue-600">LOADING...</div> : filteredProducts.map((item) => (
+            {loading ? <div className="text-center py-20 animate-pulse text-blue-600 font-black">LOADING...</div> : filteredProducts.map((item) => (
               <div key={item.id} className="group relative">
                 <ItemCard item={item} quantityInCart={cart[item.id] || 0} onUpdate={updateCart} mode={mode} />
                 {isAdmin && (
@@ -266,7 +271,7 @@ export default function Home() {
         <h2 className="text-2xl font-black text-slate-800 mb-8 uppercase italic flex items-center gap-3">🛒 Cart <span className="text-blue-600">/</span> {mode}</h2>
         <div className="flex-1 overflow-y-auto space-y-4">
           {Object.entries(cart).map(([id, qty]) => (
-            <div key={id} className="flex justify-between items-center bg-slate-50 p-5 rounded-[1.8rem] border border-slate-100 animate-in fade-in slide-in-from-right-4">
+            <div key={id} className="flex justify-between items-center bg-slate-50 p-5 rounded-[1.8rem] border border-slate-100">
               <div className="min-w-0 pr-4">
                 <p className="font-black text-slate-800 truncate text-sm">{products.find(p => p.id == id)?.name}</p>
                 <p className="text-[9px] text-blue-500 font-black uppercase tracking-widest">{products.find(p => p.id == id)?.category}</p>
@@ -274,9 +279,9 @@ export default function Home() {
               <div className="bg-white px-4 py-2 rounded-xl border border-slate-200 font-black text-blue-600">{qty}</div>
             </div>
           ))}
-          {Object.keys(cart).length === 0 && <p className="text-center text-slate-300 font-bold py-10 italic">Cart is empty</p>}
+          {Object.keys(cart).length === 0 && <p className="text-center text-slate-300 font-bold py-10 italic text-sm">ไม่มีรายการในตะกร้า</p>}
         </div>
-        <button onClick={handleConfirmAction} disabled={Object.keys(cart).length === 0} className={`w-full py-5 rounded-[2rem] font-black text-white text-lg mt-8 shadow-2xl active:scale-95 transition-all ${Object.keys(cart).length === 0 ? 'bg-slate-100 text-slate-200' : mode === 'withdraw' ? 'bg-slate-900' : 'bg-blue-600'}`}>CONFIRM</button>
+        <button onClick={handleConfirmAction} disabled={Object.keys(cart).length === 0} className={`w-full py-5 rounded-[2rem] font-black text-white text-lg mt-8 shadow-2xl active:scale-95 transition-all ${Object.keys(cart).length === 0 ? 'bg-slate-100 text-slate-300 cursor-not-allowed' : mode === 'withdraw' ? 'bg-slate-900' : 'bg-blue-600'}`}>CONFIRM</button>
       </div>
     </main>
   );
