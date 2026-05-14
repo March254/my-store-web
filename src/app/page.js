@@ -151,7 +151,7 @@ export default function Home() {
       <div className="flex-1 p-4 lg:p-10">
         <div className="max-w-3xl mx-auto">
           
-          {/* Header - เวอร์ชันแก้ไขโลโก้ (ไม่มีพื้นหลังสีน้ำเงิน) */}
+          {/* Header - แก้ไขจุดนี้: เอา bg-blue-600 และกรอบน้ำเงินออกทั้งหมด */}
           <div className="flex justify-between items-center mb-8 bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
             <div className="flex items-center gap-4">
               <div className="w-14 h-14 flex items-center justify-center overflow-hidden">
@@ -179,7 +179,7 @@ export default function Home() {
             <button onClick={() => supabase.auth.signOut().then(() => router.push('/login'))} className="bg-slate-100 hover:bg-slate-200 text-slate-900 px-5 py-2.5 rounded-xl text-xs font-black transition-all active:scale-95">LOGOUT</button>
           </div>
 
-          {/* Admin Section */}
+          {/* Admin Requests */}
           {isAdmin && Object.keys(groupedRequests).length > 0 && (
             <div className="mb-10">
               <h2 className="text-sm font-black mb-4 uppercase text-blue-600 flex items-center gap-2">🔔 คำขอรอนุมัติ ({Object.keys(groupedRequests).length})</h2>
@@ -192,7 +192,7 @@ export default function Home() {
                         <p className="text-xs font-bold text-slate-400">โดย: {items[0].borrower_name}</p>
                       </div>
                       <div className="flex gap-2">
-                        <button onClick={() => handleDecideGroup(groupId, 'approved')} className="bg-blue-600 text-white px-8 py-3 rounded-xl text-xs font-black shadow-lg active:scale-95 transition-all">อนุมัติ</button>
+                        <button onClick={() => handleDecideGroup(groupId, 'approved')} className="bg-blue-600 text-white px-8 py-3 rounded-xl text-xs font-black active:scale-95 transition-all">อนุมัติ</button>
                         <button onClick={() => handleDecideGroup(groupId, 'rejected')} className="bg-white text-red-500 border border-red-50 px-8 py-3 rounded-xl text-xs font-black active:scale-95 transition-all">ปฏิเสธ</button>
                       </div>
                     </div>
@@ -241,7 +241,7 @@ export default function Home() {
             </>
           )}
 
-          <input type="text" placeholder="ค้นหาอุปกรณ์..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full p-5 bg-white border border-slate-200 rounded-3xl shadow-sm outline-none font-bold mb-6" />
+          <input type="text" placeholder="ค้นหาอุปกรณ์..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full p-5 bg-white border border-slate-200 rounded-3xl shadow-sm outline-none font-bold mb-6 focus:ring-4 focus:ring-blue-50" />
           
           <div className="flex bg-white p-1.5 rounded-2xl border border-slate-200 mb-8 shadow-sm">
             <button onClick={() => {setMode("withdraw"); setCart({});}} className={`flex-1 py-4 rounded-xl font-black text-sm transition-all ${mode === 'withdraw' ? 'bg-slate-900 text-white' : 'text-slate-400'}`}>เบิกของ</button>
@@ -267,7 +267,6 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Cart Sidebar */}
       <div className="w-full lg:w-96 bg-white border-l p-8 flex flex-col shadow-2xl sticky lg:top-0 h-fit lg:h-screen">
         <h2 className="text-2xl font-black text-slate-800 mb-8 uppercase italic flex items-center gap-3">🛒 Cart <span className="text-blue-600">/</span> {mode}</h2>
         <div className="flex-1 overflow-y-auto space-y-4">
@@ -280,6 +279,7 @@ export default function Home() {
               <div className="bg-white px-4 py-2 rounded-xl border border-slate-200 font-black text-blue-600">{qty}</div>
             </div>
           ))}
+          {Object.keys(cart).length === 0 && <p className="text-center text-slate-300 font-bold py-10 italic text-sm">ไม่มีรายการในตะกร้า</p>}
         </div>
         <button onClick={handleConfirmAction} disabled={Object.keys(cart).length === 0} className={`w-full py-5 rounded-[2rem] font-black text-white text-lg mt-8 shadow-2xl active:scale-95 transition-all ${Object.keys(cart).length === 0 ? 'bg-slate-100 text-slate-200' : mode === 'withdraw' ? 'bg-slate-900' : 'bg-blue-600'}`}>CONFIRM</button>
       </div>
