@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import ItemCard from './ItemCard';
 
 export default function Home() {
+  // ... (State อื่นๆ เหมือนเดิม)
   const [user, setUser] = useState(null);
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -44,6 +45,53 @@ export default function Home() {
     return () => clearInterval(interval);
   }, [user, isAdmin]);
 
+  // ฟังก์ชันสำหรับการสั่งพิมพ์
+  const handlePrint = (log) => {
+    const printWindow = window.open('', '_blank');
+    const dateStr = new Date(log.created_at).toLocaleDateString('th-TH');
+    const timeStr = new Date(log.created_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+    const typeLabel = log.type === 'withdraw' ? 'เบิกของ' : 'คืนของ';
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Receipt - ${log.product_name}</title>
+          <style>
+            body { font-family: 'Sarabun', sans-serif; padding: 40px; color: #333; }
+            .header { border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px; text-align: center; }
+            .title { font-size: 24px; font-weight: bold; text-transform: uppercase; }
+            .details { margin-bottom: 30px; line-height: 2; }
+            .row { display: flex; border-bottom: 1px border #eee; padding: 5px 0; }
+            .label { width: 150px; font-weight: bold; }
+            .footer { margin-top: 50px; display: flex; justify-content: space-between; }
+            .sig { border-top: 1px solid #000; width: 200px; text-align: center; margin-top: 50px; padding-top: 5px; font-size: 12px; }
+            @media print { .no-print { display: none; } }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="title">บันทึกการ${typeLabel}อุปกรณ์</div>
+            <div>MakerStock Inventory System</div>
+          </div>
+          <div class="details">
+            <div class="row"><span class="label">ชื่อผู้ทำรายการ:</span> ${log.borrower_name}</div>
+            <div class="row"><span class="label">รายการ:</span> ${log.product_name}</div>
+            <div class="row"><span class="label">จำนวน:</span> ${log.amount}</div>
+            <div class="row"><span class="label">วันที่:</span> ${dateStr}</div>
+            <div class="row"><span class="label">เวลา:</span> ${timeStr} น.</div>
+          </div>
+          <div class="footer">
+            <div class="sig">ลงชื่อผู้รับของ/ส่งคืน</div>
+            <div class="sig">ลงชื่อเจ้าหน้าที่ (Admin)</div>
+          </div>
+          <script>window.print(); setTimeout(() => window.close(), 500);</script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
+  // ... (ฟังก์ชัน fetchData, fetch อื่นๆ เหมือนเดิม)
   const fetchData = async (email, adminStatus) => {
     fetchProducts();
     fetchMyBorrowedItems(email);
@@ -192,7 +240,7 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Admin History Modal */}
+          {/* Admin History Modal With Print Feature */}
           {showAdminHistory && isAdmin && (
             <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
               <div className="bg-white w-full max-w-4xl rounded-[2.5rem] shadow-2xl flex flex-col max-h-[85vh] overflow-hidden">
@@ -206,11 +254,11 @@ export default function Home() {
                     <div className="col-span-4">Item Name</div>
                     <div className="col-span-1 text-center">Qty</div>
                     <div className="col-span-2 text-center">Type</div>
-                    <div className="col-span-2 text-right">Date/Time</div>
+                    <div className="col-span-2 text-right">Action</div>
                   </div>
                   {allHistory.map((log) => (
                     <div key={log.id} className="grid grid-cols-12 gap-4 px-4 py-4 rounded-xl border border-slate-50 hover:bg-slate-50 transition-all items-center text-xs">
-                      <div className="col-span-3 font-bold text-slate-500 truncate">{log.borrower_name}</div>
+                      <div className="col-span-3 font-bold text-slate-500 truncate" title={log.borrower_name}>{log.borrower_name}</div>
                       <div className="col-span-4 font-black text-slate-800 uppercase truncate">{log.product_name}</div>
                       <div className="col-span-1 text-center font-black text-blue-600">x{log.amount}</div>
                       <div className="col-span-2 text-center">
@@ -218,8 +266,14 @@ export default function Home() {
                           {log.type === 'withdraw' ? 'เบิกของ' : 'คืนของ'}
                         </span>
                       </div>
-                      <div className="col-span-2 text-right text-[9px] font-bold text-slate-400 leading-tight">
-                        {new Date(log.created_at).toLocaleString('th-TH', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                      <div className="col-span-2 text-right">
+                        <button 
+                          onClick={() => handlePrint(log)}
+                          className="bg-white border border-slate-200 p-2 rounded-lg hover:bg-slate-100 transition-all shadow-sm"
+                          title="Print Receipt"
+                        >
+                          🖨️
+                        </button>
                       </div>
                     </div>
                   ))}
@@ -228,7 +282,7 @@ export default function Home() {
             </div>
           )}
 
-          {/* User History Modal */}
+          {/* ... ส่วนที่เหลือคงเดิม ... */}
           {showHistory && (
             <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
               <div className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl flex flex-col max-h-[85vh] overflow-hidden">
@@ -242,7 +296,7 @@ export default function Home() {
                       <div className="flex flex-col">
                         <span className="font-black text-slate-800 text-sm uppercase">{log.product_name}</span>
                         <span className="text-[10px] font-bold text-slate-400">
-                          {new Date(log.created_at).toLocaleString('th-TH', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          {new Date(log.created_at).toLocaleString('th-TH')}
                         </span>
                       </div>
                       <div className="flex items-center gap-4">
@@ -289,7 +343,6 @@ export default function Home() {
             </div>
           )}
 
-          {/* User Data */}
           {!isAdmin && (
             <>
               {myPendingRequests.length > 0 && (
@@ -346,7 +399,6 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Cart Sidebar */}
       <div className="w-full lg:w-96 bg-white border-l p-8 flex flex-col shadow-2xl sticky lg:top-0 h-fit lg:h-screen">
         <h2 className="text-2xl font-black text-slate-800 mb-8 uppercase italic flex items-center gap-3">🛒 Cart <span className="text-blue-600">/</span> {mode === 'withdraw' ? 'เบิกของ' : 'คืนของ'}</h2>
         <div className="flex-1 overflow-y-auto space-y-4">
