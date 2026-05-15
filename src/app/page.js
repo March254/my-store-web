@@ -44,6 +44,7 @@ export default function Home() {
     return () => clearInterval(interval);
   }, [user, isAdmin]);
 
+  // --- ฟังก์ชันพิมพ์: แยกเฉพาะรายการในรอบนั้นๆ (Group ID เดียวกัน) ---
   const handlePrintGroup = (selectedLog) => {
     const groupItems = allHistory.filter(item => 
       item.group_id === selectedLog.group_id && 
@@ -238,7 +239,8 @@ export default function Home() {
       <div className="flex-1 p-4 lg:p-10">
         <div className="max-w-3xl mx-auto">
           
-          <div className="flex justify-between items-center mb-8 bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
+          {/* Header Section */}
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100 gap-4">
             <div className="flex items-center gap-4">
               <div className="w-14 h-14 flex items-center justify-center overflow-hidden">
                 <img src="/logo.png" alt="Logo" className="w-full h-full object-contain" onError={(e) => { e.target.style.display = 'none'; e.target.parentElement.innerHTML = '<div class="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-black text-2xl">M</div>'; }} />
@@ -248,22 +250,21 @@ export default function Home() {
                 <p className="text-[10px] font-black uppercase text-blue-600 tracking-widest leading-tight">{isAdmin ? 'ADMIN PANEL' : 'USER DASHBOARD'}</p>
               </div>
             </div>
-            
-            {/* แสดงชื่อผู้ใช้ และ ปุ่มจัดการ */}
-            <div className="flex items-center gap-3">
-              <div className="hidden sm:flex flex-col items-end mr-2">
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Logged in as:</span>
+
+            <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-end">
+              <div className="flex flex-col items-end">
+                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Account</span>
                 <span className="text-xs font-bold text-slate-800">{user?.email}</span>
               </div>
               <div className="flex gap-2">
-                {isAdmin && <button onClick={() => setShowAdminHistory(true)} className="bg-slate-900 text-white px-4 py-2.5 rounded-xl text-[10px] font-black uppercase">Admin Log</button>}
-                {!isAdmin && <button onClick={() => setShowHistory(true)} className="bg-blue-50 text-blue-600 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-tight">History</button>}
+                {isAdmin && <button onClick={() => setShowAdminHistory(true)} className="bg-slate-900 text-white px-4 py-2.5 rounded-xl text-[10px] font-black uppercase">History</button>}
+                {!isAdmin && <button onClick={() => setShowHistory(true)} className="bg-blue-50 text-blue-600 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase">My History</button>}
                 <button onClick={() => supabase.auth.signOut().then(() => router.push('/login'))} className="bg-red-50 text-red-500 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase">Logout</button>
               </div>
             </div>
           </div>
 
-          {/* ประวัติ Admin */}
+          {/* Admin History Modal */}
           {showAdminHistory && isAdmin && (
             <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
               <div className="bg-white w-full max-w-4xl rounded-[2.5rem] shadow-2xl flex flex-col max-h-[85vh] overflow-hidden">
@@ -279,11 +280,11 @@ export default function Home() {
                       <div className="col-span-1 text-center font-black text-blue-600">x{log.amount}</div>
                       <div className="col-span-2 text-center">
                         <span className={`text-[9px] font-black px-2 py-1 rounded-md uppercase ${log.type === 'withdraw' ? 'bg-amber-100 text-amber-600' : 'bg-blue-100 text-blue-600'}`}>
-                          {log.type === 'withdraw' ? 'เบิกของ' : 'คืนของ'}
+                          {log.type === 'withdraw' ? 'เบิก' : 'คืน'}
                         </span>
                       </div>
                       <div className="col-span-2 text-right">
-                        <button onClick={() => handlePrintGroup(log)} className="bg-white border border-slate-200 p-2 rounded-lg hover:bg-slate-100 shadow-sm flex items-center justify-center ml-auto gap-2">
+                        <button onClick={() => handlePrintGroup(log)} className="bg-white border border-slate-200 p-2 rounded-lg hover:bg-slate-100 shadow-sm flex items-center justify-center ml-auto gap-1">
                           🖨️ <span className="text-[9px] font-bold">พิมพ์รอบนี้</span>
                         </button>
                       </div>
@@ -294,7 +295,7 @@ export default function Home() {
             </div>
           )}
 
-          {/* Admin Pending Requests */}
+          {/* Pending Requests for Admin */}
           {isAdmin && Object.keys(groupedRequests).length > 0 && (
             <div className="mb-10">
               <h2 className="text-sm font-black mb-4 uppercase text-blue-600">🔔 Pending Requests ({Object.keys(groupedRequests).length})</h2>
@@ -325,11 +326,10 @@ export default function Home() {
             </div>
           )}
 
-          {/* Search Box */}
-          <input type="text" placeholder="Search devices..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full p-5 bg-white border border-slate-200 rounded-3xl shadow-sm outline-none font-bold mb-6 focus:ring-4 focus:ring-blue-50" />
+          {/* Search & Categories */}
+          <input type="text" placeholder="Search devices..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full p-5 bg-white border border-slate-200 rounded-3xl shadow-sm outline-none font-bold mb-4 focus:ring-4 focus:ring-blue-50" />
           
-          {/* Category Tabs */}
-          <div className="flex gap-2 overflow-x-auto pb-4 mb-4 scrollbar-hide">
+          <div className="flex gap-2 overflow-x-auto pb-6 mb-2 scrollbar-hide">
             {categories.map((cat) => (
               <button 
                 key={cat} 
@@ -341,13 +341,15 @@ export default function Home() {
             ))}
           </div>
 
+          {/* Mode Selector */}
           <div className="flex bg-white p-1.5 rounded-2xl border border-slate-200 mb-8 shadow-sm">
-            <button onClick={() => {setMode("withdraw"); setCart({});}} className={`flex-1 py-4 rounded-xl font-black text-sm transition-all ${mode === 'withdraw' ? 'bg-slate-900 text-white' : 'text-slate-400'}`}>เบิกของ</button>
-            <button onClick={() => {setMode("return"); setCart({});}} className={`flex-1 py-4 rounded-xl font-black text-sm transition-all ${mode === 'return' ? 'bg-blue-600 text-white' : 'text-slate-400'}`}>คืนของ</button>
+            <button onClick={() => {setMode("withdraw"); setCart({});}} className={`flex-1 py-4 rounded-xl font-black text-sm transition-all ${mode === 'withdraw' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400'}`}>เบิกของ</button>
+            <button onClick={() => {setMode("return"); setCart({});}} className={`flex-1 py-4 rounded-xl font-black text-sm transition-all ${mode === 'return' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400'}`}>คืนของ</button>
           </div>
 
+          {/* Item Grid */}
           <div className="grid grid-cols-1 gap-4 pb-20">
-            {loading ? <div className="text-center py-20 font-black text-blue-600 uppercase tracking-widest">Loading...</div> : filteredProducts.map((item) => (
+            {loading ? <div className="text-center py-20 font-black text-blue-600 uppercase tracking-widest italic">Loading Inventory...</div> : filteredProducts.map((item) => (
               <div key={item.id} className="group relative">
                 <ItemCard item={item} quantityInCart={cart[item.id] || 0} onUpdate={updateCart} mode={mode} />
                 {isAdmin && (
@@ -359,11 +361,12 @@ export default function Home() {
         </div>
       </div>
 
+      {/* Cart Sidebar */}
       <div className="w-full lg:w-96 bg-white border-l p-8 flex flex-col shadow-2xl sticky lg:top-0 h-fit lg:h-screen">
-        <h2 className="text-2xl font-black text-slate-800 mb-8 uppercase italic flex items-center gap-3">🛒 Cart <span className="text-blue-600">/</span> {mode === 'withdraw' ? 'เบิกของ' : 'คืนของ'}</h2>
+        <h2 className="text-2xl font-black text-slate-800 mb-8 uppercase italic flex items-center gap-3">🛒 Cart <span className="text-blue-600">/</span> {mode === 'withdraw' ? 'เบิก' : 'คืน'}</h2>
         <div className="flex-1 overflow-y-auto space-y-4">
           {Object.entries(cart).map(([id, qty]) => (
-            <div key={id} className="flex justify-between items-center bg-slate-50 p-5 rounded-[1.8rem] border border-slate-100 transition-all">
+            <div key={id} className="flex justify-between items-center bg-slate-50 p-5 rounded-[1.8rem] border border-slate-100">
               <div className="min-w-0 pr-4">
                 <p className="font-black text-slate-800 truncate text-sm uppercase italic">{products.find(p => p.id == id)?.name}</p>
                 <p className="text-[9px] text-blue-500 font-black uppercase tracking-widest">{products.find(p => p.id == id)?.category}</p>
@@ -373,7 +376,7 @@ export default function Home() {
           ))}
           {Object.keys(cart).length === 0 && <p className="text-center text-slate-300 font-bold py-10 italic text-sm uppercase">Cart is Empty</p>}
         </div>
-        <button onClick={handleConfirmAction} disabled={Object.keys(cart).length === 0} className={`w-full py-5 rounded-[2rem] font-black text-white text-lg mt-8 shadow-2xl active:scale-95 transition-all ${Object.keys(cart).length === 0 ? 'bg-slate-100 text-slate-200' : mode === 'withdraw' ? 'bg-slate-900' : 'bg-blue-600'}`}>CONFIRM</button>
+        <button onClick={handleConfirmAction} disabled={Object.keys(cart).length === 0} className={`w-full py-5 rounded-[2rem] font-black text-white text-lg mt-8 shadow-2xl active:scale-95 transition-all ${Object.keys(cart).length === 0 ? 'bg-slate-100 text-slate-200' : mode === 'withdraw' ? 'bg-slate-900' : 'bg-blue-600'}`}>CONFIRM ORDER</button>
       </div>
     </main>
   );
