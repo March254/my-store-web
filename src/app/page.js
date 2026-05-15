@@ -125,7 +125,6 @@ export default function Home() {
     const { data } = await supabase.from('products').select('*').order('name');
     if (data) {
       setProducts(data);
-      // สร้างรายชื่อหมวดหมู่จากข้อมูลสินค้า
       setCategories(["All", ...new Set(data.map(item => item.category).filter(Boolean))]);
     }
     setLoading(false);
@@ -228,7 +227,6 @@ export default function Home() {
     alert("ส่งคำขอเรียบร้อยแล้ว!");
   };
 
-  // กรองตามคำค้นหาและหมวดหมู่ที่เลือก
   const filteredProducts = products.filter(item => 
     item.name.toLowerCase().includes(searchTerm.toLowerCase()) && 
     (activeCategory === "All" || item.category === activeCategory)
@@ -243,10 +241,9 @@ export default function Home() {
           
           <div className="flex justify-between items-center mb-8 bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
             <div className="flex items-center gap-4">
-              {/* จุดแก้ไข 1: โลโก้ (เอาสีพื้นหลังออกและกู้คืนรูป) */}
-              <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center relative overflow-hidden border border-slate-50">
-                <img src="/logo.png" alt="M" className="w-full h-full object-contain z-10" onError={(e) => e.target.style.display='none'}/>
-                <span className="absolute font-black text-blue-600 text-2xl">M</span>
+              {/* จุดที่แก้ไข: ลบ <span>M</span> ออกเพื่อให้ไม่ทับกับโลโก้ */}
+              <div className="w-14 h-14 bg-transparent rounded-2xl flex items-center justify-center relative overflow-hidden border border-slate-50">
+                <img src="/logo.png" alt="MakerStock Logo" className="w-full h-full object-contain z-10" />
               </div>
               <div>
                 <h1 className="text-xl font-black uppercase leading-none mb-1">MakerStock</h1>
@@ -255,7 +252,6 @@ export default function Home() {
             </div>
             
             <div className="flex items-center gap-4">
-              {/* จุดแก้ไข 2: แสดงชื่อที่ล็อคอินเข้ามา */}
               <div className="hidden sm:block text-right">
                 <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Logged in as</p>
                 <p className="text-xs font-bold text-slate-800">{user?.email}</p>
@@ -268,7 +264,7 @@ export default function Home() {
             </div>
           </div>
 
-          {/* ... (Modal ส่วนของ History คงเดิม) ... */}
+          {/* Modal และ ส่วนอื่นๆ คงเดิมตามไฟล์ page.js ของคุณ */}
           {showAdminHistory && isAdmin && (
             <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
               <div className="bg-white w-full max-w-4xl rounded-[2.5rem] shadow-2xl flex flex-col max-h-[85vh] overflow-hidden">
@@ -306,7 +302,6 @@ export default function Home() {
             </div>
           )}
 
-          {/* ... (Admin Requests คงเดิม) ... */}
           {isAdmin && Object.keys(groupedRequests).length > 0 && (
             <div className="mb-10">
               <h2 className="text-sm font-black mb-4 uppercase text-blue-600">🔔 Pending Requests ({Object.keys(groupedRequests).length})</h2>
@@ -339,7 +334,6 @@ export default function Home() {
 
           <input type="text" placeholder="Search devices..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full p-5 bg-white border border-slate-200 rounded-3xl shadow-sm outline-none font-bold mb-6 focus:ring-4 focus:ring-blue-50 transition-all" />
           
-          {/* จุดแก้ไข 3: เพิ่มแถบเลือกหมวดหมู่ (Category Tabs) */}
           <div className="flex gap-2 overflow-x-auto pb-4 mb-4 scrollbar-hide">
             {categories.map((cat) => (
               <button
