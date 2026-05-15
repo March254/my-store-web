@@ -40,15 +40,15 @@ export default function Home() {
       }
     };
     checkUser();
-    
-    // แก้ไข: ให้ fetchData ทำงานทุก 10 วินาทีเพื่อให้ข้อมูลเป็น Real-time
+
+    // ดึงข้อมูลใหม่ทุก 10 วินาที เพื่อให้ประวัติและสถานะเป็น Real-time
     const interval = setInterval(() => { 
       if (user) {
         const adminStatus = ADMIN_EMAILS.map(e => e.toLowerCase()).includes(user.email.toLowerCase());
         fetchData(user.email, adminStatus);
       }
     }, 10000);
-    
+
     return () => clearInterval(interval);
   }, [user]);
 
@@ -120,7 +120,7 @@ export default function Home() {
     fetchProducts();
     fetchMyBorrowedItems(email);
     fetchMyPendingRequests(email);
-    fetchUserHistory(email);
+    fetchUserHistory(email); // ดึงประวัติส่วนตัว
     if (adminStatus) fetchAdminData();
   };
 
@@ -139,7 +139,12 @@ export default function Home() {
   };
 
   const fetchUserHistory = async (email) => {
-    const { data } = await supabase.from('transaction_logs').select('*').eq('borrower_name', email).order('created_at', { ascending: false });
+    // แก้ไข: ตรวจสอบการดึงข้อมูลประวัติจาก transaction_logs
+    const { data } = await supabase
+      .from('transaction_logs')
+      .select('*')
+      .eq('borrower_name', email)
+      .order('created_at', { ascending: false });
     if (data) setHistory(data);
   };
 
@@ -265,7 +270,6 @@ export default function Home() {
               </div>
               <div className="flex gap-2">
                 {isAdmin && <button onClick={() => setShowAdminHistory(true)} className="bg-slate-900 text-white px-4 py-2.5 rounded-xl text-[10px] font-black">ALL HISTORY</button>}
-                {/* แก้ไข: ลบเงื่อนไข !isAdmin ออกเพื่อให้ทุกคนกดดูประวัติของตัวเองได้ */}
                 <button onClick={() => setShowHistory(true)} className="bg-blue-50 text-blue-600 px-4 py-2.5 rounded-xl text-[10px] font-black">MY HISTORY</button>
                 <button onClick={() => supabase.auth.signOut().then(() => router.push('/login'))} className="bg-slate-100 text-slate-900 px-4 py-2.5 rounded-xl text-[10px] font-black">LOGOUT</button>
               </div>
@@ -281,25 +285,32 @@ export default function Home() {
                   <button onClick={() => setShowHistory(false)} className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center font-black">✕</button>
                 </div>
                 <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                  {/* แก้ไข: การวนลูปข้อมูลจาก history (transaction_logs) */}
                   {history.map((log) => (
                     <div key={log.id} className="flex justify-between items-center p-4 rounded-2xl border border-slate-50 bg-slate-50/50">
                       <div>
-                        <p className="font-black text-slate-800 uppercase italic">{log.product_name}</p>
+                        <p className="font-black text-slate-800 uppercase italic text-sm">{log.product_name}</p>
                         <p className="text-[10px] font-bold text-slate-400">{new Date(log.created_at).toLocaleString('th-TH')}</p>
                       </div>
                       <div className="text-right">
                         <p className="font-black text-blue-600">x{log.amount}</p>
-                        <p className={`text-[9px] font-black uppercase ${log.type === 'withdraw' ? 'text-amber-500' : 'text-blue-500'}`}>{log.type === 'withdraw' ? 'เบิก' : 'คืน'}</p>
+                        <span className={`text-[9px] font-black px-2 py-0.5 rounded-md uppercase ${log.type === 'withdraw' ? 'bg-amber-100 text-amber-600' : 'bg-blue-100 text-blue-600'}`}>
+                          {log.type === 'withdraw' ? 'เบิกของ' : 'คืนของ'}
+                        </span>
                       </div>
                     </div>
                   ))}
-                  {history.length === 0 && <p className="text-center py-10 font-bold text-slate-300 italic uppercase">No transactions yet</p>}
+                  {history.length === 0 && (
+                    <div className="text-center py-20">
+                      <p className="font-bold text-slate-300 italic uppercase">No transactions yet</p>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
           )}
 
-          {/* Modal สำหรับ Admin History */}
+          {/* Admin History Modal คงเดิม */}
           {showAdminHistory && isAdmin && (
             <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
               <div className="bg-white w-full max-w-4xl rounded-[2.5rem] shadow-2xl flex flex-col max-h-[85vh] overflow-hidden">
@@ -337,7 +348,7 @@ export default function Home() {
             </div>
           )}
 
-          {/* Pending Requests สำหรับ Admin */}
+          {/* Pending Requests ส่วนแอดมินคงเดิม */}
           {isAdmin && Object.keys(groupedRequests).length > 0 && (
             <div className="mb-10">
               <h2 className="text-sm font-black mb-4 uppercase text-blue-600">🔔 Pending Requests ({Object.keys(groupedRequests).length})</h2>
@@ -407,9 +418,9 @@ export default function Home() {
       <div className="w-full lg:w-96 bg-white border-l p-8 flex flex-col shadow-2xl sticky lg:top-0 h-fit lg:h-screen">
         <h2 className="text-2xl font-black text-slate-800 mb-8 uppercase italic flex items-center gap-3">🛒 Cart <span className="text-blue-600">/</span> {mode === 'withdraw' ? 'เบิก' : 'คืน'}</h2>
         
-        {/* แก้ไข: เพิ่มการแสดงสถานะคำขอที่ยังค้างอยู่สำหรับ User ทั่วไป (Real-time) */}
+        {/* Real-time Pending สำหรับ User ทั่วไป */}
         {!isAdmin && myPendingRequests.length > 0 && (
-          <div className="mb-6 p-4 bg-amber-50 rounded-2xl border border-amber-100">
+          <div className="mb-6 p-4 bg-amber-50 rounded-2xl border border-amber-100 animate-pulse">
             <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest mb-2">Pending Confirmation</p>
             <div className="space-y-2">
               {myPendingRequests.map(req => (
