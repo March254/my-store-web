@@ -125,7 +125,7 @@ export default function Home() {
     const { data } = await supabase.from('products').select('*').order('name');
     if (data) {
       setProducts(data);
-      // สร้างรายการหมวดหมู่ที่ไม่ซ้ำกัน
+      // สร้างรายชื่อหมวดหมู่จากข้อมูลสินค้า
       setCategories(["All", ...new Set(data.map(item => item.category).filter(Boolean))]);
     }
     setLoading(false);
@@ -228,7 +228,7 @@ export default function Home() {
     alert("ส่งคำขอเรียบร้อยแล้ว!");
   };
 
-  // กรองสินค้าตามคำค้นหาและหมวดหมู่ที่เลือก
+  // กรองตามคำค้นหาและหมวดหมู่ที่เลือก
   const filteredProducts = products.filter(item => 
     item.name.toLowerCase().includes(searchTerm.toLowerCase()) && 
     (activeCategory === "All" || item.category === activeCategory)
@@ -243,10 +243,10 @@ export default function Home() {
           
           <div className="flex justify-between items-center mb-8 bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
             <div className="flex items-center gap-4">
-              {/* จุดแก้ไข: แสดงโลโก้พร้อมระบบสำรอง */}
-              <div className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-black text-2xl relative overflow-hidden">
+              {/* จุดแก้ไข 1: โลโก้ (เอาสีพื้นหลังออกและกู้คืนรูป) */}
+              <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center relative overflow-hidden border border-slate-50">
                 <img src="/logo.png" alt="M" className="w-full h-full object-contain z-10" onError={(e) => e.target.style.display='none'}/>
-                <span className="absolute">M</span>
+                <span className="absolute font-black text-blue-600 text-2xl">M</span>
               </div>
               <div>
                 <h1 className="text-xl font-black uppercase leading-none mb-1">MakerStock</h1>
@@ -255,7 +255,7 @@ export default function Home() {
             </div>
             
             <div className="flex items-center gap-4">
-              {/* จุดแก้ไข: แสดงชื่อผู้ใช้งานที่ล็อคอิน */}
+              {/* จุดแก้ไข 2: แสดงชื่อที่ล็อคอินเข้ามา */}
               <div className="hidden sm:block text-right">
                 <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Logged in as</p>
                 <p className="text-xs font-bold text-slate-800">{user?.email}</p>
@@ -268,7 +268,7 @@ export default function Home() {
             </div>
           </div>
 
-          {/* ... (Modal ส่วนของ History คงเดิมตามไฟล์ที่ให้มา) ... */}
+          {/* ... (Modal ส่วนของ History คงเดิม) ... */}
           {showAdminHistory && isAdmin && (
             <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
               <div className="bg-white w-full max-w-4xl rounded-[2.5rem] shadow-2xl flex flex-col max-h-[85vh] overflow-hidden">
@@ -306,7 +306,7 @@ export default function Home() {
             </div>
           )}
 
-          {/* ... (Admin Pending Requests คงเดิม) ... */}
+          {/* ... (Admin Requests คงเดิม) ... */}
           {isAdmin && Object.keys(groupedRequests).length > 0 && (
             <div className="mb-10">
               <h2 className="text-sm font-black mb-4 uppercase text-blue-600">🔔 Pending Requests ({Object.keys(groupedRequests).length})</h2>
@@ -337,9 +337,9 @@ export default function Home() {
             </div>
           )}
 
-          <input type="text" placeholder="Search devices..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full p-5 bg-white border border-slate-200 rounded-3xl shadow-sm outline-none font-bold mb-6 focus:ring-4 focus:ring-blue-50" />
+          <input type="text" placeholder="Search devices..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full p-5 bg-white border border-slate-200 rounded-3xl shadow-sm outline-none font-bold mb-6 focus:ring-4 focus:ring-blue-50 transition-all" />
           
-          {/* จุดแก้ไข: เพิ่มแถบหมวดหมู่ (Category Tabs) */}
+          {/* จุดแก้ไข 3: เพิ่มแถบเลือกหมวดหมู่ (Category Tabs) */}
           <div className="flex gap-2 overflow-x-auto pb-4 mb-4 scrollbar-hide">
             {categories.map((cat) => (
               <button
@@ -362,7 +362,7 @@ export default function Home() {
           </div>
 
           <div className="grid grid-cols-1 gap-4 pb-20">
-            {loading ? <div className="text-center py-20 font-black text-blue-600 uppercase tracking-widest">Loading...</div> : filteredProducts.map((item) => (
+            {loading ? <div className="text-center py-20 font-black text-blue-600 uppercase tracking-widest animate-pulse">Loading Inventory...</div> : filteredProducts.map((item) => (
               <div key={item.id} className="group relative">
                 <ItemCard item={item} quantityInCart={cart[item.id] || 0} onUpdate={updateCart} mode={mode} />
                 {isAdmin && (
@@ -374,7 +374,6 @@ export default function Home() {
         </div>
       </div>
 
-      {/* ... (ส่วน Cart Sidebar ด้านล่างคงเดิมตามไฟล์ล่าสุด) ... */}
       <div className="w-full lg:w-96 bg-white border-l p-8 flex flex-col shadow-2xl sticky lg:top-0 h-fit lg:h-screen">
         <h2 className="text-2xl font-black text-slate-800 mb-8 uppercase italic flex items-center gap-3">🛒 Cart <span className="text-blue-600">/</span> {mode === 'withdraw' ? 'เบิกของ' : 'คืนของ'}</h2>
         <div className="flex-1 overflow-y-auto space-y-4">
