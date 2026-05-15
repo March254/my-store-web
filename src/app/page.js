@@ -26,7 +26,7 @@ export default function Home() {
 
   const ADMIN_EMAILS = ["admin@email.com", "your-email@email.com"]; 
 
-  // จุดที่ 1: แก้ไขปัญหา Refresh แล้วหลุดออกจากระบบ
+  // --- แก้ไขจุดที่ 1: กันหลุดตอน Refresh และรักษาการเชื่อมต่อ ---
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (session?.user) {
@@ -34,7 +34,17 @@ export default function Home() {
         setBorrower(session.user.email);
         const adminStatus = ADMIN_EMAILS.map(e => e.toLowerCase()).includes(session.user.email.toLowerCase());
         setIsAdmin(adminStatus);
+        
         fetchData(session.user.email, adminStatus);
+
+        // ดักฟังการเปลี่ยนแปลงแบบ Real-time
+        const channel = supabase.channel('schema-db-changes')
+          .on('postgres_changes', { event: '*', schema: 'public' }, () => {
+            fetchData(session.user.email, adminStatus);
+          })
+          .subscribe();
+
+        return () => { supabase.removeChannel(channel); };
       } else {
         router.push('/login');
       }
@@ -42,81 +52,17 @@ export default function Home() {
     return () => subscription.unsubscribe();
   }, []);
 
-  const handlePrintGroup = (selectedLog) => {
-    const groupItems = allHistory.filter(item => 
-      item.group_id === selectedLog.group_id && 
-      item.type === selectedLog.type &&
-      Math.abs(new Date(item.created_at) - new Date(selectedLog.created_at)) < 60000
-    );
-
-    const printWindow = window.open('', '_blank');
-    const dateStr = new Date(selectedLog.created_at).toLocaleDateString('th-TH');
-    const timeStr = new Date(selectedLog.created_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
-    const typeLabel = selectedLog.type === 'withdraw' ? 'เบิกของ' : 'คืนของ';
-
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>Receipt - รอบ ${timeStr}</title>
-          <style>
-            body { font-family: 'Sarabun', sans-serif; padding: 40px; color: #333; }
-            .header { border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px; text-align: center; }
-            .title { font-size: 22px; font-weight: bold; }
-            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-            th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
-            th { background-color: #f9f9f9; font-weight: bold; }
-            .info { margin-bottom: 20px; line-height: 1.8; }
-            .footer { margin-top: 60px; display: flex; justify-content: space-between; }
-            .sig { border-top: 1px solid #000; width: 220px; text-align: center; margin-top: 50px; padding-top: 8px; font-size: 13px; }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <div class="title">ใบเสร็จบันทึกรายการ${typeLabel} (รายรอบ)</div>
-            <div style="font-size: 11px; color: #666;">รหัสรอบ: ${selectedLog.group_id}</div>
-          </div>
-          <div class="info">
-            <div><strong>ผู้ทำรายการ:</strong> ${selectedLog.borrower_name}</div>
-            <div><strong>วันที่/เวลา:</strong> ${dateStr} | ${timeStr} น.</div>
-          </div>
-          <table>
-            <thead>
-              <tr>
-                <th>รายการอุปกรณ์ (รอบนี้เท่านั้น)</th>
-                <th style="width: 100px; text-align: center;">จำนวน</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${groupItems.map(item => `
-                <tr>
-                  <td>${item.product_name}</td>
-                  <td style="text-align: center;">${item.amount}</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-          <div class="footer">
-            <div class="sig">ลงชื่อผู้ทำรายการ</div>
-            <div class="sig">ลงชื่อเจ้าหน้าที่ (Admin)</div>
-          </div>
-          <script>window.print(); setTimeout(() => window.close(), 500);</script>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
-  };
-
   const fetchData = async (email, adminStatus) => {
     fetchProducts();
     fetchMyBorrowedItems(email);
     fetchMyPendingRequests(email);
-    fetchUserHistory(email);
+    fetchUserHistory(email); // ดึงประวัติ User
     if (adminStatus) fetchAdminData();
   };
 
   const fetchAdminData = () => {
     fetchAdminRequests();
-    fetchAllTransactions(); 
+    fetchAllTransactions(); // ดึงประวัติรวมของ Admin
   };
 
   const fetchProducts = async () => {
@@ -239,14 +185,9 @@ export default function Home() {
           
           <div className="flex justify-between items-center mb-8 bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
             <div className="flex items-center gap-4">
-              {/* จุดที่ 2: แก้ไขโลโก้ และคงชื่อ MakerStock */}
+              {/* โลโก้ */}
               <div className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-black text-2xl overflow-hidden relative">
-                <img 
-                  src="/logo.png" 
-                  alt="Logo" 
-                  className="w-full h-full object-contain z-10"
-                  onError={(e) => { e.target.style.display = 'none'; }} 
-                />
+                <img src="/logo.png" alt="M" className="w-full h-full object-contain z-10" onError={(e) => { e.target.style.display = 'none'; }} />
                 <span className="absolute">M</span>
               </div>
               <div>
@@ -254,159 +195,150 @@ export default function Home() {
                 <p className="text-[10px] font-black uppercase text-blue-600 tracking-widest leading-tight">{isAdmin ? 'ADMIN PANEL' : 'USER DASHBOARD'}</p>
               </div>
             </div>
+            
             <div className="flex items-center gap-4">
               <div className="hidden sm:block text-right">
                 <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Logged in as</p>
                 <p className="text-xs font-bold text-slate-800">{user?.email}</p>
               </div>
               <div className="flex gap-2">
-                {isAdmin && <button onClick={() => setShowAdminHistory(true)} className="bg-slate-900 text-white px-4 py-2.5 rounded-xl text-[10px] font-black uppercase">Admin Hist</button>}
-                {!isAdmin && <button onClick={() => setShowHistory(true)} className="bg-blue-50 text-blue-600 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase">My Hist</button>}
-                <button onClick={() => supabase.auth.signOut()} className="bg-slate-100 text-slate-900 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase">Logout</button>
+                {isAdmin && <button onClick={() => setShowAdminHistory(true)} className="bg-slate-900 text-white px-4 py-2.5 rounded-xl text-[10px] font-black">ALL HISTORY</button>}
+                <button onClick={() => setShowHistory(true)} className="bg-blue-50 text-blue-600 px-4 py-2.5 rounded-xl text-[10px] font-black">MY HISTORY</button>
+                <button onClick={() => supabase.auth.signOut()} className="bg-slate-100 text-slate-900 px-4 py-2.5 rounded-xl text-[10px] font-black">LOGOUT</button>
               </div>
             </div>
           </div>
 
-          {/* จุดที่ 3: สถานะ Pending แสดงข้างหน้าเลยสำหรับ User */}
-          {!isAdmin && myPendingRequests.length > 0 && (
-            <div className="mb-6 bg-amber-50 border border-amber-100 p-4 rounded-2xl">
-              <h2 className="text-[10px] font-black uppercase text-amber-600 mb-2 tracking-widest italic">🕒 กำลังรออนุมัติ</h2>
-              <div className="flex flex-wrap gap-2">
-                {myPendingRequests.map(req => (
-                  <div key={req.id} className="bg-white px-3 py-1.5 rounded-lg border border-amber-200 text-[10px] font-bold text-slate-700">
-                    {req.product_name} <span className="text-amber-500 font-black">x{req.amount}</span>
+          {/* จุดที่แก้ไข: แสดงสถานะ Pending และ ของที่ถืออยู่ ทันที */}
+          {!isAdmin && (
+            <div className="space-y-4 mb-8">
+               {myPendingRequests.length > 0 && (
+                <div className="bg-amber-50 border border-amber-100 p-4 rounded-2xl">
+                  <h2 className="text-[10px] font-black uppercase text-amber-600 mb-2 italic">🕒 กำลังรออนุมัติ</h2>
+                  <div className="flex flex-wrap gap-2">
+                    {myPendingRequests.map(req => (
+                      <div key={req.id} className="bg-white px-3 py-1.5 rounded-lg border border-amber-200 text-[10px] font-bold">{req.product_name} x{req.amount}</div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* ประวัติ Admin */}
-          {showAdminHistory && isAdmin && (
-            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-              <div className="bg-white w-full max-w-4xl rounded-[2.5rem] shadow-2xl flex flex-col max-h-[85vh] overflow-hidden">
-                <div className="p-8 border-b flex justify-between items-center bg-slate-900 text-white">
-                  <h2 className="text-xl font-black uppercase tracking-tighter">Global Transaction Log</h2>
-                  <button onClick={() => setShowAdminHistory(false)} className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center font-black">✕</button>
                 </div>
-                <div className="flex-1 overflow-y-auto p-6 space-y-2">
-                  {allHistory.map((log) => (
-                    <div key={log.id} className="grid grid-cols-12 gap-4 px-4 py-4 rounded-xl border border-slate-50 hover:bg-slate-50 items-center text-xs">
-                      <div className="col-span-3 font-bold text-slate-500 truncate">{log.borrower_name}</div>
-                      <div className="col-span-4 font-black text-slate-800 uppercase truncate">{log.product_name}</div>
-                      <div className="col-span-1 text-center font-black text-blue-600">x{log.amount}</div>
-                      <div className="col-span-2 text-center uppercase text-[9px] font-black">{log.type}</div>
-                      <div className="col-span-2 text-right">
-                        <button onClick={() => handlePrintGroup(log)} className="bg-white border border-slate-200 p-2 rounded-lg text-[9px] font-bold uppercase">Print</button>
+              )}
+              {myItems.length > 0 && (
+                <div className="bg-blue-50 border border-blue-100 p-4 rounded-2xl">
+                  <h2 className="text-[10px] font-black uppercase text-blue-600 mb-2 italic">📦 อุปกรณ์ที่ต้องคืน</h2>
+                  <div className="grid grid-cols-2 gap-2">
+                    {myItems.map(item => (
+                      <div key={item.name} className="bg-white p-2 rounded-lg border border-blue-200 flex justify-between text-[10px] font-bold uppercase">
+                        <span>{item.name}</span> <span className="text-blue-600">x{item.qty}</span>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           )}
 
-          {/* ประวัติ User */}
-          {showHistory && !isAdmin && (
-            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-              <div className="bg-white w-full max-w-xl rounded-[2.5rem] shadow-2xl flex flex-col max-h-[80vh] overflow-hidden">
-                <div className="p-8 border-b flex justify-between items-center bg-blue-600 text-white">
-                  <h2 className="text-xl font-black uppercase tracking-tighter">My History</h2>
-                  <button onClick={() => setShowHistory(false)} className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center font-black">✕</button>
-                </div>
-                <div className="flex-1 overflow-y-auto p-6 space-y-2">
-                  {history.map((log) => (
-                    <div key={log.id} className="flex justify-between items-center p-4 border-b">
-                      <div>
-                        <p className="text-xs font-black uppercase">{log.product_name}</p>
-                        <p className="text-[9px] text-slate-400">{new Date(log.created_at).toLocaleString()}</p>
-                      </div>
-                      <span className="text-xs font-black text-blue-600 uppercase">{log.type} x{log.amount}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
+          {/* Admin Pending Requests */}
           {isAdmin && Object.keys(groupedRequests).length > 0 && (
             <div className="mb-10">
-              <h2 className="text-sm font-black mb-4 uppercase text-blue-600">🔔 Pending Requests ({Object.keys(groupedRequests).length})</h2>
-              <div className="max-h-[500px] overflow-y-auto pr-2 space-y-6">
-                {Object.entries(groupedRequests).map(([groupId, items]) => (
-                  <div key={groupId} className="bg-white border-l-8 border-l-blue-600 p-8 rounded-[2.5rem] shadow-xl border border-slate-100">
-                    <div className="flex justify-between items-center mb-6">
-                      <div>
-                        <h3 className="font-black text-slate-800 uppercase text-lg tracking-tighter">Order #{groupId.slice(-5)}</h3>
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{items[0].borrower_name}</p>
-                      </div>
-                      <div className="flex gap-2">
-                        <button onClick={() => handleDecideGroup(groupId, 'approved')} className="bg-blue-600 text-white px-6 py-3 rounded-xl text-[10px] font-black shadow-lg">APPROVE</button>
-                        <button onClick={() => handleDecideGroup(groupId, 'rejected')} className="bg-white text-red-500 border border-red-50 px-6 py-3 rounded-xl text-[10px] font-black">REJECT</button>
-                      </div>
-                    </div>
-                    <div className="space-y-2 border-t pt-4">
-                      {items.map(item => (
-                        <div key={item.id} className="flex justify-between text-sm font-bold text-slate-600 bg-slate-50 p-3 rounded-xl">
-                          <span>{item.product_name}</span>
-                          <span className="text-blue-600 font-black">x{item.amount}</span>
-                        </div>
-                      ))}
+              <h2 className="text-sm font-black mb-4 uppercase text-blue-600">🔔 Pending Requests</h2>
+              {Object.entries(groupedRequests).map(([groupId, items]) => (
+                <div key={groupId} className="bg-white border-l-8 border-l-blue-600 p-6 rounded-[2rem] shadow-sm border border-slate-100 mb-4">
+                  <div className="flex justify-between items-center mb-4">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{items[0].borrower_name}</p>
+                    <div className="flex gap-2">
+                      <button onClick={() => handleDecideGroup(groupId, 'approved')} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-[10px] font-black">APPROVE</button>
+                      <button onClick={() => handleDecideGroup(groupId, 'rejected')} className="bg-white text-red-500 border border-red-50 px-4 py-2 rounded-lg text-[10px] font-black">REJECT</button>
                     </div>
                   </div>
-                ))}
-              </div>
+                  {items.map(item => <div key={item.id} className="text-xs font-bold text-slate-600">• {item.product_name} x{item.amount}</div>)}
+                </div>
+              ))}
             </div>
           )}
 
-          <input type="text" placeholder="Search devices..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full p-5 bg-white border border-slate-200 rounded-3xl shadow-sm outline-none font-bold mb-6 focus:ring-4 focus:ring-blue-50" />
+          <input type="text" placeholder="Search..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full p-5 bg-white border border-slate-200 rounded-3xl shadow-sm outline-none font-bold mb-6" />
           
           <div className="flex gap-2 overflow-x-auto pb-4 mb-4 scrollbar-hide">
             {categories.map((cat) => (
-              <button 
-                key={cat} 
-                onClick={() => setActiveCategory(cat)} 
-                className={`px-6 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${activeCategory === cat ? 'bg-blue-600 text-white shadow-lg' : 'bg-white text-slate-400 border border-slate-100'}`}
-              >
-                {cat}
-              </button>
+              <button key={cat} onClick={() => setActiveCategory(cat)} className={`px-6 py-2.5 rounded-2xl text-[10px] font-black uppercase whitespace-nowrap ${activeCategory === cat ? 'bg-blue-600 text-white shadow-lg' : 'bg-white text-slate-400 border border-slate-100'}`}>{cat}</button>
             ))}
           </div>
 
           <div className="flex bg-white p-1.5 rounded-2xl border border-slate-200 mb-8 shadow-sm">
-            <button onClick={() => {setMode("withdraw"); setCart({});}} className={`flex-1 py-4 rounded-xl font-black text-sm transition-all ${mode === 'withdraw' ? 'bg-slate-900 text-white' : 'text-slate-400'}`}>เบิกของ</button>
-            <button onClick={() => {setMode("return"); setCart({});}} className={`flex-1 py-4 rounded-xl font-black text-sm transition-all ${mode === 'return' ? 'bg-blue-600 text-white' : 'text-slate-400'}`}>คืนของ</button>
+            <button onClick={() => {setMode("withdraw"); setCart({});}} className={`flex-1 py-4 rounded-xl font-black text-sm ${mode === 'withdraw' ? 'bg-slate-900 text-white' : 'text-slate-400'}`}>เบิกของ</button>
+            <button onClick={() => {setMode("return"); setCart({});}} className={`flex-1 py-4 rounded-xl font-black text-sm ${mode === 'return' ? 'bg-blue-600 text-white' : 'text-slate-400'}`}>คืนของ</button>
           </div>
 
           <div className="grid grid-cols-1 gap-4 pb-20">
-            {loading ? <div className="text-center py-20 font-black text-blue-600 uppercase tracking-widest">Loading...</div> : filteredProducts.map((item) => (
+            {loading ? <div className="text-center py-20 font-black text-blue-600 uppercase">Loading...</div> : filteredProducts.map((item) => (
               <div key={item.id} className="group relative">
                 <ItemCard item={item} quantityInCart={cart[item.id] || 0} onUpdate={updateCart} mode={mode} />
-                {isAdmin && (
-                  <button onClick={() => { const n = prompt(`Set Stock: ${item.name}`, item.stock); if (n !== null) handleAdminUpdateStock(item.id, n); }} className="absolute top-4 right-4 z-20 bg-white/90 text-[9px] font-black px-3 py-1.5 rounded-xl border border-slate-200 opacity-0 group-hover:opacity-100 transition-all shadow-sm">SET STOCK</button>
-                )}
+                {isAdmin && <button onClick={() => { const n = prompt(`Set Stock: ${item.name}`, item.stock); if (n !== null) handleAdminUpdateStock(item.id, n); }} className="absolute top-4 right-4 z-20 bg-white/90 text-[9px] font-black px-3 py-1.5 rounded-xl border border-slate-200 opacity-0 group-hover:opacity-100">SET STOCK</button>}
               </div>
             ))}
           </div>
         </div>
       </div>
 
+      {/* Cart Sidebar */}
       <div className="w-full lg:w-96 bg-white border-l p-8 flex flex-col shadow-2xl sticky lg:top-0 h-fit lg:h-screen">
         <h2 className="text-2xl font-black text-slate-800 mb-8 uppercase italic flex items-center gap-3">🛒 Cart <span className="text-blue-600">/</span> {mode === 'withdraw' ? 'เบิก' : 'คืน'}</h2>
         <div className="flex-1 overflow-y-auto space-y-4">
           {Object.entries(cart).map(([id, qty]) => (
-            <div key={id} className="flex justify-between items-center bg-slate-50 p-5 rounded-[1.8rem] border border-slate-100 transition-all">
+            <div key={id} className="flex justify-between items-center bg-slate-50 p-5 rounded-[1.8rem] border border-slate-100">
               <div className="min-w-0 pr-4">
                 <p className="font-black text-slate-800 truncate text-sm uppercase italic">{products.find(p => p.id == id)?.name}</p>
-                <p className="text-[9px] text-blue-500 font-black uppercase tracking-widest">{products.find(p => p.id == id)?.category}</p>
               </div>
               <div className="bg-white px-4 py-2 rounded-xl border border-slate-200 font-black text-blue-600">x{qty}</div>
             </div>
           ))}
-          {Object.keys(cart).length === 0 && <p className="text-center text-slate-300 font-bold py-10 italic text-sm uppercase">Cart is Empty</p>}
         </div>
-        <button onClick={handleConfirmAction} disabled={Object.keys(cart).length === 0} className={`w-full py-5 rounded-[2rem] font-black text-white text-lg mt-8 shadow-2xl active:scale-95 transition-all ${Object.keys(cart).length === 0 ? 'bg-slate-100 text-slate-200' : mode === 'withdraw' ? 'bg-slate-900' : 'bg-blue-600'}`}>CONFIRM</button>
+        <button onClick={handleConfirmAction} disabled={Object.keys(cart).length === 0} className={`w-full py-5 rounded-[2rem] font-black text-white text-lg mt-8 shadow-2xl ${Object.keys(cart).length === 0 ? 'bg-slate-100 text-slate-200' : mode === 'withdraw' ? 'bg-slate-900' : 'bg-blue-600'}`}>CONFIRM</button>
       </div>
+
+      {/* Modal ประวัติ */}
+      {showHistory && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-xl rounded-[2.5rem] shadow-2xl flex flex-col max-h-[80vh] overflow-hidden">
+            <div className="p-8 border-b flex justify-between items-center bg-blue-600 text-white">
+              <h2 className="text-xl font-black uppercase">My History</h2>
+              <button onClick={() => setShowHistory(false)} className="font-black">✕</button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-6 space-y-2">
+              {history.length > 0 ? history.map((log) => (
+                <div key={log.id} className="flex justify-between items-center p-4 border-b bg-slate-50 rounded-xl mb-2">
+                  <div>
+                    <p className="text-xs font-black uppercase">{log.product_name}</p>
+                    <p className="text-[9px] text-slate-400">{new Date(log.created_at).toLocaleString()}</p>
+                  </div>
+                  <span className={`text-xs font-black uppercase ${log.type === 'withdraw' ? 'text-slate-900' : 'text-blue-600'}`}>{log.type} x{log.amount}</span>
+                </div>
+              )) : <p className="text-center py-10 text-slate-400 font-bold italic">No history found</p>}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showAdminHistory && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-4xl rounded-[2.5rem] shadow-2xl flex flex-col max-h-[85vh] overflow-hidden">
+            <div className="p-8 border-b flex justify-between items-center bg-slate-900 text-white">
+              <h2 className="text-xl font-black uppercase italic">Global History</h2>
+              <button onClick={() => setShowAdminHistory(false)} className="font-black">✕</button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-6 space-y-1">
+              {allHistory.map((log) => (
+                <div key={log.id} className="grid grid-cols-4 gap-4 p-4 border-b text-[10px] font-bold uppercase items-center">
+                  <span>{log.borrower_name}</span>
+                  <span className="font-black">{log.product_name}</span>
+                  <span className="text-blue-600 text-center">x{log.amount} ({log.type})</span>
+                  <button onClick={() => {}} className="text-right">PRINT</button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
