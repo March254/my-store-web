@@ -26,30 +26,29 @@ export default function Home() {
 
   const ADMIN_EMAILS = ["admin@email.com", "your-email@email.com"]; 
 
+  // จุดที่ 1: แก้ไขปัญหา Refresh แล้วหลุดออกจากระบบ
   useEffect(() => {
-    const checkUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        router.push('/login');
-      } else {
-        setUser(user);
-        setBorrower(user.email);
-        const adminStatus = ADMIN_EMAILS.map(e => e.toLowerCase()).includes(user.email.toLowerCase());
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session?.user) {
+        setUser(session.user);
+        setBorrower(session.user.email);
+        const adminStatus = ADMIN_EMAILS.map(e => e.toLowerCase()).includes(session.user.email.toLowerCase());
         setIsAdmin(adminStatus);
-        fetchData(user.email, adminStatus);
+        fetchData(session.user.email, adminStatus);
+      } else {
+        router.push('/login');
       }
-    };
-    checkUser();
-    const interval = setInterval(() => { if (user) fetchData(user.email, isAdmin); }, 10000);
-    return () => clearInterval(interval);
-  }, [user, isAdmin]);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
 
   const handlePrintGroup = (selectedLog) => {
     const groupItems = allHistory.filter(item => 
       item.group_id === selectedLog.group_id && 
-      item.type === selectedLog.type
+      item.type === selectedLog.type &&
+      Math.abs(new Date(item.created_at) - new Date(selectedLog.created_at)) < 60000
     );
-    
+
     const printWindow = window.open('', '_blank');
     const dateStr = new Date(selectedLog.created_at).toLocaleDateString('th-TH');
     const timeStr = new Date(selectedLog.created_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
@@ -65,7 +64,7 @@ export default function Home() {
             .title { font-size: 22px; font-weight: bold; }
             table { width: 100%; border-collapse: collapse; margin-top: 20px; }
             th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
-            th { background-color: #f9f9f9; }
+            th { background-color: #f9f9f9; font-weight: bold; }
             .info { margin-bottom: 20px; line-height: 1.8; }
             .footer { margin-top: 60px; display: flex; justify-content: space-between; }
             .sig { border-top: 1px solid #000; width: 220px; text-align: center; margin-top: 50px; padding-top: 8px; font-size: 13px; }
@@ -74,6 +73,7 @@ export default function Home() {
         <body>
           <div class="header">
             <div class="title">ใบเสร็จบันทึกรายการ${typeLabel} (รายรอบ)</div>
+            <div style="font-size: 11px; color: #666;">รหัสรอบ: ${selectedLog.group_id}</div>
           </div>
           <div class="info">
             <div><strong>ผู้ทำรายการ:</strong> ${selectedLog.borrower_name}</div>
@@ -82,7 +82,7 @@ export default function Home() {
           <table>
             <thead>
               <tr>
-                <th>รายการอุปกรณ์</th>
+                <th>รายการอุปกรณ์ (รอบนี้เท่านั้น)</th>
                 <th style="width: 100px; text-align: center;">จำนวน</th>
               </tr>
             </thead>
@@ -95,6 +95,10 @@ export default function Home() {
               `).join('')}
             </tbody>
           </table>
+          <div class="footer">
+            <div class="sig">ลงชื่อผู้ทำรายการ</div>
+            <div class="sig">ลงชื่อเจ้าหน้าที่ (Admin)</div>
+          </div>
           <script>window.print(); setTimeout(() => window.close(), 500);</script>
         </body>
       </html>
@@ -235,77 +239,44 @@ export default function Home() {
           
           <div className="flex justify-between items-center mb-8 bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
             <div className="flex items-center gap-4">
-              <div className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-black text-2xl">M</div>
+              {/* จุดที่ 2: แก้ไขโลโก้ และคงชื่อ MakerStock */}
+              <div className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-black text-2xl overflow-hidden relative">
+                <img 
+                  src="/logo.png" 
+                  alt="Logo" 
+                  className="w-full h-full object-contain z-10"
+                  onError={(e) => { e.target.style.display = 'none'; }} 
+                />
+                <span className="absolute">M</span>
+              </div>
               <div>
                 <h1 className="text-xl font-black uppercase leading-none mb-1">MakerStock</h1>
                 <p className="text-[10px] font-black uppercase text-blue-600 tracking-widest leading-tight">{isAdmin ? 'ADMIN PANEL' : 'USER DASHBOARD'}</p>
               </div>
             </div>
-            
             <div className="flex items-center gap-4">
               <div className="hidden sm:block text-right">
                 <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Logged in as</p>
                 <p className="text-xs font-bold text-slate-800">{user?.email}</p>
               </div>
               <div className="flex gap-2">
-                {isAdmin && <button onClick={() => setShowAdminHistory(true)} className="bg-slate-900 text-white px-4 py-2.5 rounded-xl text-[10px] font-black">ALL HISTORY</button>}
-                {/* ปุ่มดูประวัติสำหรับ User */}
-                {!isAdmin && <button onClick={() => setShowHistory(true)} className="bg-blue-50 text-blue-600 px-4 py-2.5 rounded-xl text-[10px] font-black">MY HISTORY</button>}
-                <button onClick={() => supabase.auth.signOut().then(() => router.push('/login'))} className="bg-slate-100 text-slate-900 px-4 py-2.5 rounded-xl text-[10px] font-black">LOGOUT</button>
+                {isAdmin && <button onClick={() => setShowAdminHistory(true)} className="bg-slate-900 text-white px-4 py-2.5 rounded-xl text-[10px] font-black uppercase">Admin Hist</button>}
+                {!isAdmin && <button onClick={() => setShowHistory(true)} className="bg-blue-50 text-blue-600 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase">My Hist</button>}
+                <button onClick={() => supabase.auth.signOut()} className="bg-slate-100 text-slate-900 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase">Logout</button>
               </div>
             </div>
           </div>
 
-          {/* Modal สำหรับแสดงประวัติของ User (Status & History) */}
-          {showHistory && (
-            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-              <div className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl flex flex-col max-h-[85vh] overflow-hidden">
-                <div className="p-8 border-b flex justify-between items-center bg-blue-600 text-white">
-                  <h2 className="text-xl font-black uppercase tracking-tighter">My Status & History</h2>
-                  <button onClick={() => setShowHistory(false)} className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center font-black">✕</button>
-                </div>
-                <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                  {/* แสดงรายการที่กำลังรออนุมัติ (Status) */}
-                  <div>
-                    <h3 className="text-xs font-black uppercase text-blue-600 mb-3 tracking-widest">🕒 Pending Approval</h3>
-                    {myPendingRequests.length === 0 ? (
-                      <p className="text-xs text-slate-400 italic">No pending requests</p>
-                    ) : (
-                      <div className="space-y-2">
-                        {myPendingRequests.map(req => (
-                          <div key={req.id} className="flex justify-between items-center p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                            <div>
-                              <p className="text-xs font-black text-slate-800 uppercase">{req.product_name}</p>
-                              <p className="text-[10px] font-bold text-slate-400 uppercase">{req.type === 'withdraw' ? 'เบิก' : 'คืน'}</p>
-                            </div>
-                            <span className="text-xs font-black text-blue-600">x{req.amount}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+          {/* จุดที่ 3: สถานะ Pending แสดงข้างหน้าเลยสำหรับ User */}
+          {!isAdmin && myPendingRequests.length > 0 && (
+            <div className="mb-6 bg-amber-50 border border-amber-100 p-4 rounded-2xl">
+              <h2 className="text-[10px] font-black uppercase text-amber-600 mb-2 tracking-widest italic">🕒 กำลังรออนุมัติ</h2>
+              <div className="flex flex-wrap gap-2">
+                {myPendingRequests.map(req => (
+                  <div key={req.id} className="bg-white px-3 py-1.5 rounded-lg border border-amber-200 text-[10px] font-bold text-slate-700">
+                    {req.product_name} <span className="text-amber-500 font-black">x{req.amount}</span>
                   </div>
-
-                  {/* แสดงประวัติที่สำเร็จแล้ว */}
-                  <div>
-                    <h3 className="text-xs font-black uppercase text-slate-400 mb-3 tracking-widest">✅ Completed Transactions</h3>
-                    <div className="space-y-2">
-                      {history.map(log => (
-                        <div key={log.id} className="flex justify-between items-center p-4 bg-white rounded-2xl border border-slate-100">
-                          <div>
-                            <p className="text-xs font-black text-slate-800 uppercase">{log.product_name}</p>
-                            <p className="text-[10px] font-bold text-slate-400">{new Date(log.created_at).toLocaleString('th-TH')}</p>
-                          </div>
-                          <div className="text-right">
-                            <span className={`text-[9px] font-black px-2 py-1 rounded-md uppercase ${log.type === 'withdraw' ? 'bg-amber-100 text-amber-600' : 'bg-blue-100 text-blue-600'}`}>
-                              {log.type === 'withdraw' ? 'เบิก' : 'คืน'}
-                            </span>
-                            <p className="text-xs font-black text-slate-800 mt-1">x{log.amount}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
+                ))}
               </div>
             </div>
           )}
@@ -324,16 +295,33 @@ export default function Home() {
                       <div className="col-span-3 font-bold text-slate-500 truncate">{log.borrower_name}</div>
                       <div className="col-span-4 font-black text-slate-800 uppercase truncate">{log.product_name}</div>
                       <div className="col-span-1 text-center font-black text-blue-600">x{log.amount}</div>
-                      <div className="col-span-2 text-center">
-                        <span className={`text-[9px] font-black px-2 py-1 rounded-md uppercase ${log.type === 'withdraw' ? 'bg-amber-100 text-amber-600' : 'bg-blue-100 text-blue-600'}`}>
-                          {log.type === 'withdraw' ? 'เบิก' : 'คืน'}
-                        </span>
-                      </div>
+                      <div className="col-span-2 text-center uppercase text-[9px] font-black">{log.type}</div>
                       <div className="col-span-2 text-right">
-                        <button onClick={() => handlePrintGroup(log)} className="bg-white border border-slate-200 p-2 rounded-lg hover:bg-slate-100 shadow-sm flex items-center justify-center ml-auto gap-2">
-                          🖨️ <span className="text-[9px] font-bold">พิมพ์รอบนี้</span>
-                        </button>
+                        <button onClick={() => handlePrintGroup(log)} className="bg-white border border-slate-200 p-2 rounded-lg text-[9px] font-bold uppercase">Print</button>
                       </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ประวัติ User */}
+          {showHistory && !isAdmin && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+              <div className="bg-white w-full max-w-xl rounded-[2.5rem] shadow-2xl flex flex-col max-h-[80vh] overflow-hidden">
+                <div className="p-8 border-b flex justify-between items-center bg-blue-600 text-white">
+                  <h2 className="text-xl font-black uppercase tracking-tighter">My History</h2>
+                  <button onClick={() => setShowHistory(false)} className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center font-black">✕</button>
+                </div>
+                <div className="flex-1 overflow-y-auto p-6 space-y-2">
+                  {history.map((log) => (
+                    <div key={log.id} className="flex justify-between items-center p-4 border-b">
+                      <div>
+                        <p className="text-xs font-black uppercase">{log.product_name}</p>
+                        <p className="text-[9px] text-slate-400">{new Date(log.created_at).toLocaleString()}</p>
+                      </div>
+                      <span className="text-xs font-black text-blue-600 uppercase">{log.type} x{log.amount}</span>
                     </div>
                   ))}
                 </div>
@@ -404,7 +392,7 @@ export default function Home() {
       </div>
 
       <div className="w-full lg:w-96 bg-white border-l p-8 flex flex-col shadow-2xl sticky lg:top-0 h-fit lg:h-screen">
-        <h2 className="text-2xl font-black text-slate-800 mb-8 uppercase italic flex items-center gap-3">🛒 Cart <span className="text-blue-600">/</span> {mode === 'withdraw' ? 'เบิกของ' : 'คืนของ'}</h2>
+        <h2 className="text-2xl font-black text-slate-800 mb-8 uppercase italic flex items-center gap-3">🛒 Cart <span className="text-blue-600">/</span> {mode === 'withdraw' ? 'เบิก' : 'คืน'}</h2>
         <div className="flex-1 overflow-y-auto space-y-4">
           {Object.entries(cart).map(([id, qty]) => (
             <div key={id} className="flex justify-between items-center bg-slate-50 p-5 rounded-[1.8rem] border border-slate-100 transition-all">
