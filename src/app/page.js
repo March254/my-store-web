@@ -41,7 +41,6 @@ export default function Home() {
     };
     checkUser();
 
-    // ดึงข้อมูลใหม่ทุก 10 วินาที เพื่อให้ประวัติและสถานะเป็น Real-time
     const interval = setInterval(() => { 
       if (user) {
         const adminStatus = ADMIN_EMAILS.map(e => e.toLowerCase()).includes(user.email.toLowerCase());
@@ -120,7 +119,7 @@ export default function Home() {
     fetchProducts();
     fetchMyBorrowedItems(email);
     fetchMyPendingRequests(email);
-    fetchUserHistory(email); // ดึงประวัติส่วนตัว
+    fetchUserHistory(email); 
     if (adminStatus) fetchAdminData();
   };
 
@@ -138,14 +137,20 @@ export default function Home() {
     setLoading(false);
   };
 
+  // แก้ไขฟังก์ชันดึงประวัติ: เน้นดึงตามอีเมลและเรียงเวลา
   const fetchUserHistory = async (email) => {
-    // แก้ไข: ตรวจสอบการดึงข้อมูลประวัติจาก transaction_logs
-    const { data } = await supabase
+    if (!email) return;
+    const { data, error } = await supabase
       .from('transaction_logs')
       .select('*')
       .eq('borrower_name', email)
       .order('created_at', { ascending: false });
-    if (data) setHistory(data);
+    
+    if (error) {
+      console.error("Error fetching history:", error);
+    } else {
+      setHistory(data || []);
+    }
   };
 
   const fetchAllTransactions = async () => {
@@ -190,6 +195,7 @@ export default function Home() {
     fetchProducts();
   };
 
+  // แก้ไขฟังก์ชัน Approve: เพิ่มความละเอียดในการบันทึกลง log
   const handleDecideGroup = async (groupId, decision) => {
     const requests = groupedRequests[groupId];
     try {
@@ -197,8 +203,12 @@ export default function Home() {
         if (decision === 'approved') {
           const item = products.find(p => p.id == req.product_id);
           const newStock = req.type === 'withdraw' ? item.stock - req.amount : item.stock + req.amount;
+          
+          // 1. อัปเดตสต็อก
           await supabase.from('products').update({ stock: newStock }).eq('id', req.product_id);
-          await supabase.from('transaction_logs').insert([{
+          
+          // 2. บันทึก Transaction Log (ตรวจสอบชื่อคอลัมน์ให้ตรงกับ DB)
+          const { error: logError } = await supabase.from('transaction_logs').insert([{
             product_id: req.product_id, 
             product_name: req.product_name,
             amount: req.amount, 
@@ -206,11 +216,17 @@ export default function Home() {
             type: req.type,
             group_id: groupId 
           }]);
+          if (logError) throw logError;
         }
+        // 3. อัปเดตสถานะคำขอ
         await supabase.from('borrow_requests').update({ status: decision }).eq('id', req.id);
       }
       fetchData(user.email, isAdmin);
-    } catch (e) { alert("Error saving transaction"); }
+      alert(decision === 'approved' ? "อนุมัติเรียบร้อย" : "ปฏิเสธคำขอเรียบร้อย");
+    } catch (e) { 
+      console.error("Transaction Error:", e);
+      alert("เกิดข้อผิดพลาดในการบันทึกข้อมูล"); 
+    }
   };
 
   const updateCart = (itemId, amount) => {
@@ -285,7 +301,6 @@ export default function Home() {
                   <button onClick={() => setShowHistory(false)} className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center font-black">✕</button>
                 </div>
                 <div className="flex-1 overflow-y-auto p-6 space-y-4">
-                  {/* แก้ไข: การวนลูปข้อมูลจาก history (transaction_logs) */}
                   {history.map((log) => (
                     <div key={log.id} className="flex justify-between items-center p-4 rounded-2xl border border-slate-50 bg-slate-50/50">
                       <div>
@@ -348,7 +363,6 @@ export default function Home() {
             </div>
           )}
 
-          {/* Pending Requests ส่วนแอดมินคงเดิม */}
           {isAdmin && Object.keys(groupedRequests).length > 0 && (
             <div className="mb-10">
               <h2 className="text-sm font-black mb-4 uppercase text-blue-600">🔔 Pending Requests ({Object.keys(groupedRequests).length})</h2>
@@ -418,7 +432,6 @@ export default function Home() {
       <div className="w-full lg:w-96 bg-white border-l p-8 flex flex-col shadow-2xl sticky lg:top-0 h-fit lg:h-screen">
         <h2 className="text-2xl font-black text-slate-800 mb-8 uppercase italic flex items-center gap-3">🛒 Cart <span className="text-blue-600">/</span> {mode === 'withdraw' ? 'เบิก' : 'คืน'}</h2>
         
-        {/* Real-time Pending สำหรับ User ทั่วไป */}
         {!isAdmin && myPendingRequests.length > 0 && (
           <div className="mb-6 p-4 bg-amber-50 rounded-2xl border border-amber-100 animate-pulse">
             <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest mb-2">Pending Confirmation</p>
