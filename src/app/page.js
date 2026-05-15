@@ -44,7 +44,6 @@ export default function Home() {
     return () => clearInterval(interval);
   }, [user, isAdmin]);
 
-  // --- ฟังก์ชันพิมพ์แบบแยก "รอบต่อรอบ" ---
   const handlePrintGroup = (selectedLog) => {
     const groupItems = allHistory.filter(item => 
       item.group_id === selectedLog.group_id && 
@@ -239,7 +238,6 @@ export default function Home() {
       <div className="flex-1 p-4 lg:p-10">
         <div className="max-w-3xl mx-auto">
           
-          {/* Header - กู้คืนโลโก้ */}
           <div className="flex justify-between items-center mb-8 bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
             <div className="flex items-center gap-4">
               <div className="w-14 h-14 flex items-center justify-center overflow-hidden">
@@ -250,10 +248,18 @@ export default function Home() {
                 <p className="text-[10px] font-black uppercase text-blue-600 tracking-widest leading-tight">{isAdmin ? 'ADMIN PANEL' : 'USER DASHBOARD'}</p>
               </div>
             </div>
-            <div className="flex gap-2">
-              {isAdmin && <button onClick={() => setShowAdminHistory(true)} className="bg-slate-900 text-white px-4 py-2.5 rounded-xl text-[10px] font-black">ALL HISTORY</button>}
-              {!isAdmin && <button onClick={() => setShowHistory(true)} className="bg-blue-50 text-blue-600 px-4 py-2.5 rounded-xl text-[10px] font-black">MY HISTORY</button>}
-              <button onClick={() => supabase.auth.signOut().then(() => router.push('/login'))} className="bg-slate-100 text-slate-900 px-4 py-2.5 rounded-xl text-[10px] font-black">LOGOUT</button>
+            
+            {/* แสดงชื่อผู้ใช้ และ ปุ่มจัดการ */}
+            <div className="flex items-center gap-3">
+              <div className="hidden sm:flex flex-col items-end mr-2">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Logged in as:</span>
+                <span className="text-xs font-bold text-slate-800">{user?.email}</span>
+              </div>
+              <div className="flex gap-2">
+                {isAdmin && <button onClick={() => setShowAdminHistory(true)} className="bg-slate-900 text-white px-4 py-2.5 rounded-xl text-[10px] font-black uppercase">Admin Log</button>}
+                {!isAdmin && <button onClick={() => setShowHistory(true)} className="bg-blue-50 text-blue-600 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-tight">History</button>}
+                <button onClick={() => supabase.auth.signOut().then(() => router.push('/login'))} className="bg-red-50 text-red-500 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase">Logout</button>
+              </div>
             </div>
           </div>
 
@@ -322,7 +328,7 @@ export default function Home() {
           {/* Search Box */}
           <input type="text" placeholder="Search devices..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full p-5 bg-white border border-slate-200 rounded-3xl shadow-sm outline-none font-bold mb-6 focus:ring-4 focus:ring-blue-50" />
           
-          {/* Category Tabs - กู้คืนแถบหมวดหมู่ */}
+          {/* Category Tabs */}
           <div className="flex gap-2 overflow-x-auto pb-4 mb-4 scrollbar-hide">
             {categories.map((cat) => (
               <button 
