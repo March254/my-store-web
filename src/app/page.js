@@ -214,18 +214,31 @@ export default function Home() {
             </div>
           </div>
 
-          {/* User Pending Requests Status (ส่วนที่เพิ่ม: แสดงสถานะรออนุมัติของ User) */}
+          {/* ส่วนที่เพิ่มกลับมา: รายการของที่คุณถืออยู่ (My Items) */}
+          {!isAdmin && myItems.length > 0 && (
+            <div className="mb-8 p-6 bg-blue-600 rounded-[2rem] shadow-xl shadow-blue-200">
+              <h2 className="text-xs font-black text-white/70 uppercase tracking-widest mb-4">📦 รายการอุปกรณ์ที่คุณถืออยู่</h2>
+              <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+                {myItems.map((item, idx) => (
+                  <div key={idx} className="bg-white/10 backdrop-blur-md px-5 py-3 rounded-2xl border border-white/20 flex-shrink-0">
+                    <p className="text-xs font-black text-white uppercase italic">{item.name}</p>
+                    <p className="text-[10px] font-bold text-white/60 mt-1 uppercase">ถืออยู่: {item.qty}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Pending Status for User */}
           {!isAdmin && myPendingRequests.length > 0 && (
             <div className="mb-8 p-6 bg-amber-50 rounded-[2rem] border border-amber-100">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xs font-black text-amber-600 uppercase tracking-widest">⏳ คำขอที่รอการอนุมัติ ({myPendingRequests.length})</h2>
-              </div>
-              <div className="flex gap-3 overflow-x-auto pb-2">
+              <h2 className="text-xs font-black text-amber-600 uppercase tracking-widest mb-4">⏳ คำขอที่รอการอนุมัติ ({myPendingRequests.length})</h2>
+              <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
                 {myPendingRequests.map((req) => (
                   <div key={req.id} className="bg-white px-4 py-3 rounded-2xl shadow-sm border border-amber-100 flex-shrink-0 min-w-[150px]">
                     <p className="text-[10px] font-black text-slate-800 uppercase truncate">{req.product_name}</p>
                     <div className="flex justify-between items-center mt-1">
-                      <span className="text-[9px] font-bold text-slate-400">จำนวน: {req.amount}</span>
+                      <span className="text-[9px] font-bold text-slate-400 font-mono">x{req.amount}</span>
                       <span className="text-[9px] font-black text-amber-500 uppercase italic">{req.type}</span>
                     </div>
                   </div>
@@ -234,7 +247,7 @@ export default function Home() {
             </div>
           )}
 
-          {/* Admin Pending Requests */}
+          {/* Admin Pending Panel */}
           {isAdmin && Object.keys(groupedRequests).length > 0 && (
             <div className="mb-10">
               <h2 className="text-sm font-black mb-4 uppercase text-blue-600">🔔 Pending Requests</h2>
@@ -254,19 +267,17 @@ export default function Home() {
             </div>
           )}
 
-          {/* Search & Categories */}
+          {/* Main Controls */}
           <input type="text" placeholder="Search devices..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full p-5 bg-white border border-slate-200 rounded-3xl shadow-sm outline-none font-bold mb-6 focus:ring-4 focus:ring-blue-50 transition-all" />
           <div className="flex gap-2 overflow-x-auto pb-4 mb-4 scrollbar-hide">{categories.map((cat) => (
             <button key={cat} onClick={() => setActiveCategory(cat)} className={`px-6 py-2.5 rounded-2xl text-[10px] font-black uppercase whitespace-nowrap transition-all ${activeCategory === cat ? 'bg-blue-600 text-white shadow-lg' : 'bg-white text-slate-400 border border-slate-100'}`}>{cat}</button>
           ))}</div>
 
-          {/* Mode Switcher */}
           <div className="flex bg-white p-1.5 rounded-2xl border border-slate-200 mb-8 shadow-sm">
             <button onClick={() => {setMode("withdraw"); setCart({});}} className={`flex-1 py-4 rounded-xl font-black text-sm transition-all ${mode === 'withdraw' ? 'bg-slate-900 text-white' : 'text-slate-400'}`}>เบิกของ</button>
             <button onClick={() => {setMode("return"); setCart({});}} className={`flex-1 py-4 rounded-xl font-black text-sm transition-all ${mode === 'return' ? 'bg-blue-600 text-white' : 'text-slate-400'}`}>คืนของ</button>
           </div>
 
-          {/* Product List */}
           <div className="grid grid-cols-1 gap-4 pb-20">{loading ? <div className="text-center py-20 font-black text-blue-600 uppercase tracking-widest animate-pulse">Loading Inventory...</div> : filteredProducts.map((item) => (
             <div key={item.id} className="group relative">
               <ItemCard item={item} quantityInCart={cart[item.id] || 0} onUpdate={updateCart} mode={mode} />
@@ -286,26 +297,26 @@ export default function Home() {
                 <p className="font-black text-slate-800 truncate text-sm uppercase italic">{products.find(p => p.id == id)?.name}</p>
                 <p className="text-[9px] text-blue-500 font-black uppercase tracking-widest">{products.find(p => p.id == id)?.category}</p>
               </div>
-              <div className="bg-white px-4 py-2 rounded-xl border border-slate-200 font-black text-blue-600">x{qty}</div>
+              <div className="bg-white px-4 py-2 rounded-xl border border-slate-200 font-black text-blue-600 font-mono">x{qty}</div>
             </div>
           ))}
           {Object.keys(cart).length === 0 && <p className="text-center text-slate-300 font-bold py-10 italic text-sm uppercase">Cart is Empty</p>}
         </div>
-        <button onClick={handleConfirmAction} disabled={Object.keys(cart).length === 0} className={`w-full py-5 rounded-[2rem] font-black text-white text-lg mt-8 shadow-2xl active:scale-95 transition-all ${Object.keys(cart).length === 0 ? 'bg-slate-100 text-slate-200' : mode === 'withdraw' ? 'bg-slate-900' : 'bg-blue-600'}`}>CONFIRM</button>
+        <button onClick={handleConfirmAction} disabled={Object.keys(cart).length === 0} className={`w-full py-5 rounded-[2rem] font-black text-white text-lg mt-8 shadow-2xl active:scale-95 transition-all ${Object.keys(cart).length === 0 ? 'bg-slate-100 text-slate-200' : mode === 'withdraw' ? 'bg-slate-900 shadow-slate-200' : 'bg-blue-600 shadow-blue-200'}`}>CONFIRM</button>
       </div>
 
-      {/* Modals remain the same... (History & Admin History) */}
+      {/* Modals */}
       {showHistory && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl flex flex-col max-h-[80vh] overflow-hidden">
+          <div className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl flex flex-col max-h-[80vh] overflow-hidden animate-in zoom-in-95 duration-200">
             <div className="p-8 border-b flex justify-between items-center">
-              <h2 className="text-xl font-black uppercase tracking-tighter">My History</h2>
+              <h2 className="text-xl font-black uppercase tracking-tighter italic">My History</h2>
               <button onClick={() => setShowHistory(false)} className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center font-black">✕</button>
             </div>
             <div className="flex-1 overflow-y-auto p-6 space-y-4">{history.map((log) => (
               <div key={log.id} className="flex justify-between items-center p-4 rounded-2xl border border-slate-50 bg-slate-50/50">
                 <div><p className="font-black text-slate-800 uppercase italic text-sm">{log.product_name}</p><p className="text-[10px] font-bold text-slate-400">{new Date(log.created_at).toLocaleString('th-TH')}</p></div>
-                <div className="text-right"><p className="font-black text-blue-600">x{log.amount}</p><span className={`text-[9px] font-black px-2 py-0.5 rounded-md uppercase ${log.type === 'withdraw' ? 'bg-amber-100 text-amber-600' : 'bg-blue-100 text-blue-600'}`}>{log.type === 'withdraw' ? 'เบิกของ' : 'คืนของ'}</span></div>
+                <div className="text-right"><p className="font-black text-blue-600 font-mono">x{log.amount}</p><span className={`text-[9px] font-black px-2 py-0.5 rounded-md uppercase ${log.type === 'withdraw' ? 'bg-amber-100 text-amber-600' : 'bg-blue-100 text-blue-600'}`}>{log.type === 'withdraw' ? 'เบิกของ' : 'คืนของ'}</span></div>
               </div>
             ))}</div>
           </div>
@@ -314,9 +325,9 @@ export default function Home() {
 
       {showAdminHistory && isAdmin && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-4xl rounded-[2.5rem] shadow-2xl flex flex-col max-h-[85vh] overflow-hidden">
+          <div className="bg-white w-full max-w-4xl rounded-[2.5rem] shadow-2xl flex flex-col max-h-[85vh] overflow-hidden animate-in zoom-in-95 duration-200">
             <div className="p-8 border-b flex justify-between items-center bg-slate-900 text-white">
-              <h2 className="text-xl font-black uppercase tracking-tighter">Global Transaction Log</h2>
+              <h2 className="text-xl font-black uppercase tracking-tighter italic">Global Transaction Log</h2>
               <button onClick={() => setShowAdminHistory(false)} className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center font-black text-white">✕</button>
             </div>
             <div className="flex-1 overflow-y-auto p-6 space-y-2">{allHistory.map((log) => (
@@ -324,9 +335,9 @@ export default function Home() {
                 <div className="col-span-3 font-bold text-slate-500 truncate">{log.borrower_name}</div>
                 <div className="col-span-4 font-black text-slate-800 uppercase truncate">{log.product_name}</div>
                 <div className="col-span-1 text-center font-black text-blue-600">x{log.amount}</div>
-                <div className="col-span-2 text-center uppercase text-[9px] font-black">{log.type}</div>
+                <div className="col-span-2 text-center uppercase text-[9px] font-black italic">{log.type}</div>
                 <div className="col-span-2 text-right">
-                  <button onClick={() => handlePrintGroup(log)} className="bg-white border border-slate-200 p-2 rounded-lg hover:bg-slate-100 shadow-sm text-[9px] font-bold">🖨️ พิมพ์</button>
+                  <button onClick={() => handlePrintGroup(log)} className="bg-white border border-slate-200 p-2 rounded-lg hover:bg-slate-100 shadow-sm text-[9px] font-black">🖨️ พิมพ์</button>
                 </div>
               </div>
             ))}</div>
