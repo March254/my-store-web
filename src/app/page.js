@@ -44,13 +44,11 @@ export default function Home() {
     return () => clearInterval(interval);
   }, [user, isAdmin]);
 
-  // --- [FIXED] ฟังก์ชันพิมพ์แบบ "ตัดเป็นต่อรอบ" อย่างเด็ดขาด ---
   const handlePrintGroup = (selectedLog) => {
-    // กรองเฉพาะรายการที่อยู่ในรอบเดียวกันจริงๆ (เช็คทั้ง Group ID, ประเภท และเวลาที่ใกล้เคียงกัน)
     const groupItems = allHistory.filter(item => 
       item.group_id === selectedLog.group_id && 
       item.type === selectedLog.type &&
-      Math.abs(new Date(item.created_at) - new Date(selectedLog.created_at)) < 60000 // ในระยะ 1 นาทีของกลุ่มนั้น
+      Math.abs(new Date(item.created_at) - new Date(selectedLog.created_at)) < 60000 
     );
 
     const printWindow = window.open('', '_blank');
@@ -127,6 +125,7 @@ export default function Home() {
     const { data } = await supabase.from('products').select('*').order('name');
     if (data) {
       setProducts(data);
+      // สร้างรายการหมวดหมู่ที่ไม่ซ้ำกัน
       setCategories(["All", ...new Set(data.map(item => item.category).filter(Boolean))]);
     }
     setLoading(false);
@@ -218,7 +217,7 @@ export default function Home() {
 
   const handleConfirmAction = async () => {
     if (Object.keys(cart).length === 0) return;
-    const groupId = `GRP-${Date.now()}`; // สร้าง ID ใหม่ทุกครั้งที่กดยืนยันรอบนั้น
+    const groupId = `GRP-${Date.now()}`;
     const inserts = Object.entries(cart).map(([id, qty]) => ({
       product_id: id, product_name: products.find(p => p.id == id).name,
       amount: qty, borrower_name: borrower, type: mode, status: 'pending', group_id: groupId
@@ -229,6 +228,7 @@ export default function Home() {
     alert("ส่งคำขอเรียบร้อยแล้ว!");
   };
 
+  // กรองสินค้าตามคำค้นหาและหมวดหมู่ที่เลือก
   const filteredProducts = products.filter(item => 
     item.name.toLowerCase().includes(searchTerm.toLowerCase()) && 
     (activeCategory === "All" || item.category === activeCategory)
@@ -243,19 +243,32 @@ export default function Home() {
           
           <div className="flex justify-between items-center mb-8 bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
             <div className="flex items-center gap-4">
-              <div className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-black text-2xl">M</div>
+              {/* จุดแก้ไข: แสดงโลโก้พร้อมระบบสำรอง */}
+              <div className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-black text-2xl relative overflow-hidden">
+                <img src="/logo.png" alt="M" className="w-full h-full object-contain z-10" onError={(e) => e.target.style.display='none'}/>
+                <span className="absolute">M</span>
+              </div>
               <div>
                 <h1 className="text-xl font-black uppercase leading-none mb-1">MakerStock</h1>
                 <p className="text-[10px] font-black uppercase text-blue-600 tracking-widest leading-tight">{isAdmin ? 'ADMIN PANEL' : 'USER DASHBOARD'}</p>
               </div>
             </div>
-            <div className="flex gap-2">
-              {isAdmin && <button onClick={() => setShowAdminHistory(true)} className="bg-slate-900 text-white px-4 py-2.5 rounded-xl text-[10px] font-black">ALL HISTORY</button>}
-              {!isAdmin && <button onClick={() => setShowHistory(true)} className="bg-blue-50 text-blue-600 px-4 py-2.5 rounded-xl text-[10px] font-black">MY HISTORY</button>}
-              <button onClick={() => supabase.auth.signOut().then(() => router.push('/login'))} className="bg-slate-100 text-slate-900 px-4 py-2.5 rounded-xl text-[10px] font-black">LOGOUT</button>
+            
+            <div className="flex items-center gap-4">
+              {/* จุดแก้ไข: แสดงชื่อผู้ใช้งานที่ล็อคอิน */}
+              <div className="hidden sm:block text-right">
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Logged in as</p>
+                <p className="text-xs font-bold text-slate-800">{user?.email}</p>
+              </div>
+              <div className="flex gap-2">
+                {isAdmin && <button onClick={() => setShowAdminHistory(true)} className="bg-slate-900 text-white px-4 py-2.5 rounded-xl text-[10px] font-black">ALL HISTORY</button>}
+                {!isAdmin && <button onClick={() => setShowHistory(true)} className="bg-blue-50 text-blue-600 px-4 py-2.5 rounded-xl text-[10px] font-black">MY HISTORY</button>}
+                <button onClick={() => supabase.auth.signOut().then(() => router.push('/login'))} className="bg-slate-100 text-slate-900 px-4 py-2.5 rounded-xl text-[10px] font-black">LOGOUT</button>
+              </div>
             </div>
           </div>
 
+          {/* ... (Modal ส่วนของ History คงเดิมตามไฟล์ที่ให้มา) ... */}
           {showAdminHistory && isAdmin && (
             <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
               <div className="bg-white w-full max-w-4xl rounded-[2.5rem] shadow-2xl flex flex-col max-h-[85vh] overflow-hidden">
@@ -293,7 +306,7 @@ export default function Home() {
             </div>
           )}
 
-          {/* Pending Requests for Admin */}
+          {/* ... (Admin Pending Requests คงเดิม) ... */}
           {isAdmin && Object.keys(groupedRequests).length > 0 && (
             <div className="mb-10">
               <h2 className="text-sm font-black mb-4 uppercase text-blue-600">🔔 Pending Requests ({Object.keys(groupedRequests).length})</h2>
@@ -326,6 +339,23 @@ export default function Home() {
 
           <input type="text" placeholder="Search devices..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full p-5 bg-white border border-slate-200 rounded-3xl shadow-sm outline-none font-bold mb-6 focus:ring-4 focus:ring-blue-50" />
           
+          {/* จุดแก้ไข: เพิ่มแถบหมวดหมู่ (Category Tabs) */}
+          <div className="flex gap-2 overflow-x-auto pb-4 mb-4 scrollbar-hide">
+            {categories.map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setActiveCategory(cat)}
+                className={`px-6 py-2.5 rounded-2xl text-[10px] font-black uppercase whitespace-nowrap transition-all ${
+                  activeCategory === cat 
+                  ? 'bg-blue-600 text-white shadow-lg' 
+                  : 'bg-white text-slate-400 border border-slate-100'
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+
           <div className="flex bg-white p-1.5 rounded-2xl border border-slate-200 mb-8 shadow-sm">
             <button onClick={() => {setMode("withdraw"); setCart({});}} className={`flex-1 py-4 rounded-xl font-black text-sm transition-all ${mode === 'withdraw' ? 'bg-slate-900 text-white' : 'text-slate-400'}`}>เบิกของ</button>
             <button onClick={() => {setMode("return"); setCart({});}} className={`flex-1 py-4 rounded-xl font-black text-sm transition-all ${mode === 'return' ? 'bg-blue-600 text-white' : 'text-slate-400'}`}>คืนของ</button>
@@ -344,6 +374,7 @@ export default function Home() {
         </div>
       </div>
 
+      {/* ... (ส่วน Cart Sidebar ด้านล่างคงเดิมตามไฟล์ล่าสุด) ... */}
       <div className="w-full lg:w-96 bg-white border-l p-8 flex flex-col shadow-2xl sticky lg:top-0 h-fit lg:h-screen">
         <h2 className="text-2xl font-black text-slate-800 mb-8 uppercase italic flex items-center gap-3">🛒 Cart <span className="text-blue-600">/</span> {mode === 'withdraw' ? 'เบิกของ' : 'คืนของ'}</h2>
         <div className="flex-1 overflow-y-auto space-y-4">
