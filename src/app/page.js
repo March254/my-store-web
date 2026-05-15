@@ -44,11 +44,15 @@ export default function Home() {
     return () => clearInterval(interval);
   }, [user, isAdmin]);
 
-  // --- [FIXED] ฟังก์ชันพิมพ์แบบแยก "รอบต่อรอบ" อย่างชัดเจน ---
+  // --- [FIXED] ฟังก์ชันพิมพ์แบบ "ตัดเป็นต่อรอบ" อย่างเด็ดขาด ---
   const handlePrintGroup = (selectedLog) => {
-    // กรองหาเฉพาะรายการที่มี Group ID เดียวกัน (ซึ่งถูกสร้างมาเฉพาะแต่ละรอบที่กด Confirm)
-    const groupItems = allHistory.filter(item => item.group_id === selectedLog.group_id);
-    
+    // กรองเฉพาะรายการที่อยู่ในรอบเดียวกันจริงๆ (เช็คทั้ง Group ID, ประเภท และเวลาที่ใกล้เคียงกัน)
+    const groupItems = allHistory.filter(item => 
+      item.group_id === selectedLog.group_id && 
+      item.type === selectedLog.type &&
+      Math.abs(new Date(item.created_at) - new Date(selectedLog.created_at)) < 60000 // ในระยะ 1 นาทีของกลุ่มนั้น
+    );
+
     const printWindow = window.open('', '_blank');
     const dateStr = new Date(selectedLog.created_at).toLocaleDateString('th-TH');
     const timeStr = new Date(selectedLog.created_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
@@ -59,56 +63,47 @@ export default function Home() {
         <head>
           <title>Receipt - รอบ ${timeStr}</title>
           <style>
-            body { font-family: 'Sarabun', sans-serif; padding: 40px; color: #333; line-height: 1.5; }
-            .header { border-bottom: 2px solid #333; padding-bottom: 15px; margin-bottom: 25px; text-align: center; }
-            .title { font-size: 24px; font-weight: 800; text-transform: uppercase; }
+            body { font-family: 'Sarabun', sans-serif; padding: 40px; color: #333; }
+            .header { border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px; text-align: center; }
+            .title { font-size: 22px; font-weight: bold; }
             table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-            th, td { border: 1px solid #eee; padding: 12px; text-align: left; }
-            th { background-color: #fcfcfc; font-weight: bold; border-bottom: 2px solid #ddd; }
-            .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 25px; font-size: 14px; }
-            .footer { margin-top: 60px; display: flex; justify-content: space-between; gap: 40px; }
-            .sig-box { flex: 1; text-align: center; }
-            .sig-line { border-top: 1px solid #000; margin-top: 50px; padding-top: 8px; font-size: 12px; font-weight: bold; }
+            th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+            th { background-color: #f9f9f9; font-weight: bold; }
+            .info { margin-bottom: 20px; line-height: 1.8; }
+            .footer { margin-top: 60px; display: flex; justify-content: space-between; }
+            .sig { border-top: 1px solid #000; width: 220px; text-align: center; margin-top: 50px; padding-top: 8px; font-size: 13px; }
           </style>
         </head>
         <body>
           <div class="header">
-            <div class="title">บันทึกรายการ${typeLabel}อุปกรณ์</div>
-            <div style="font-size: 11px; color: #888; margin-top: 8px;">Order Reference: ${selectedLog.group_id}</div>
+            <div class="title">ใบเสร็จบันทึกรายการ${typeLabel} (รายรอบ)</div>
+            <div style="font-size: 11px; color: #666;">รหัสรอบ: ${selectedLog.group_id}</div>
           </div>
-          <div class="info-grid">
-            <div><strong>ชื่อผู้ทำรายการ:</strong> ${selectedLog.borrower_name}</div>
-            <div style="text-align: right;"><strong>วันที่:</strong> ${dateStr}</div>
-            <div><strong>เวลาที่บันทึก:</strong> ${timeStr} น.</div>
-            <div style="text-align: right;"><strong>ประเภท:</strong> ${typeLabel}</div>
+          <div class="info">
+            <div><strong>ผู้ทำรายการ:</strong> ${selectedLog.borrower_name}</div>
+            <div><strong>วันที่/เวลา:</strong> ${dateStr} | ${timeStr} น.</div>
           </div>
           <table>
             <thead>
               <tr>
-                <th>รายการอุปกรณ์ (ในรอบนี้)</th>
+                <th>รายการอุปกรณ์ (รอบนี้เท่านั้น)</th>
                 <th style="width: 100px; text-align: center;">จำนวน</th>
               </tr>
             </thead>
             <tbody>
               ${groupItems.map(item => `
                 <tr>
-                  <td style="font-weight: 500;">${item.product_name}</td>
-                  <td style="text-align: center; font-weight: bold;">x ${item.amount}</td>
+                  <td>${item.product_name}</td>
+                  <td style="text-align: center;">${item.amount}</td>
                 </tr>
               `).join('')}
             </tbody>
           </table>
           <div class="footer">
-            <div class="sig-box">
-              <div class="sig-line">ลงชื่อผู้ทำรายการ</div>
-            </div>
-            <div class="sig-box">
-              <div class="sig-line">ลงชื่อเจ้าหน้าที่ (Admin)</div>
-            </div>
+            <div class="sig">ลงชื่อผู้ทำรายการ</div>
+            <div class="sig">ลงชื่อเจ้าหน้าที่ (Admin)</div>
           </div>
-          <script>
-            window.onload = function() { window.print(); setTimeout(() => window.close(), 500); }
-          </script>
+          <script>window.print(); setTimeout(() => window.close(), 500);</script>
         </body>
       </html>
     `);
@@ -223,7 +218,7 @@ export default function Home() {
 
   const handleConfirmAction = async () => {
     if (Object.keys(cart).length === 0) return;
-    const groupId = `GRP-${Date.now()}`; // สร้าง ID ใหม่ทุกครั้งที่กด Confirm เพื่อแยกเป็นรอบ
+    const groupId = `GRP-${Date.now()}`; // สร้าง ID ใหม่ทุกครั้งที่กดยืนยันรอบนั้น
     const inserts = Object.entries(cart).map(([id, qty]) => ({
       product_id: id, product_name: products.find(p => p.id == id).name,
       amount: qty, borrower_name: borrower, type: mode, status: 'pending', group_id: groupId
@@ -261,13 +256,12 @@ export default function Home() {
             </div>
           </div>
 
-          {/* ประวัติรวมของแอดมิน (แยกตามรอบ) */}
           {showAdminHistory && isAdmin && (
             <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
               <div className="bg-white w-full max-w-4xl rounded-[2.5rem] shadow-2xl flex flex-col max-h-[85vh] overflow-hidden">
                 <div className="p-8 border-b flex justify-between items-center bg-slate-900 text-white">
                   <h2 className="text-xl font-black uppercase tracking-tighter">Global Transaction Log</h2>
-                  <button onClick={() => setShowAdminHistory(false)} className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center font-black">✕</button>
+                  <button onClick={() => setShowAdminHistory(false)} className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center font-black text-white">✕</button>
                 </div>
                 <div className="flex-1 overflow-y-auto p-6 space-y-2">
                   <div className="grid grid-cols-12 gap-4 px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b mb-4">
@@ -288,8 +282,8 @@ export default function Home() {
                         </span>
                       </div>
                       <div className="col-span-2 text-right">
-                        <button onClick={() => handlePrintGroup(log)} className="bg-white border border-slate-200 p-2 rounded-lg hover:bg-slate-100 shadow-sm flex items-center justify-center ml-auto gap-1">
-                          🖨️ <span className="text-[9px] font-bold">พิมพ์รวมรอบ</span>
+                        <button onClick={() => handlePrintGroup(log)} className="bg-white border border-slate-200 p-2 rounded-lg hover:bg-slate-100 shadow-sm flex items-center justify-center ml-auto gap-2">
+                          🖨️ <span className="text-[9px] font-bold">พิมพ์รอบนี้</span>
                         </button>
                       </div>
                     </div>
@@ -354,7 +348,7 @@ export default function Home() {
         <h2 className="text-2xl font-black text-slate-800 mb-8 uppercase italic flex items-center gap-3">🛒 Cart <span className="text-blue-600">/</span> {mode === 'withdraw' ? 'เบิกของ' : 'คืนของ'}</h2>
         <div className="flex-1 overflow-y-auto space-y-4">
           {Object.entries(cart).map(([id, qty]) => (
-            <div key={id} className="flex justify-between items-center bg-slate-50 p-5 rounded-[1.8rem] border border-slate-100">
+            <div key={id} className="flex justify-between items-center bg-slate-50 p-5 rounded-[1.8rem] border border-slate-100 transition-all">
               <div className="min-w-0 pr-4">
                 <p className="font-black text-slate-800 truncate text-sm uppercase italic">{products.find(p => p.id == id)?.name}</p>
                 <p className="text-[9px] text-blue-500 font-black uppercase tracking-widest">{products.find(p => p.id == id)?.category}</p>
