@@ -132,13 +132,25 @@ export default function Home() {
     } catch (e) { alert("Error saving transaction"); }
   };
 
-  const updateCart = (itemId, amount) => {
+  const updateCart = (itemId, amount, isDirect = false) => {
     const item = products.find(p => p.id == itemId);
-    const newQty = (cart[itemId] || 0) + amount;
-    if (mode === "withdraw" && newQty > item.stock) return alert("Not enough stock");
+    if (!item) return;
+
+    // ตรวจสอบว่าเป็นระบุจำนวนโดยตรง หรือเป็นการกดปุ่มเพิ่ม/ลดทีละ 1
+    let newQty = isDirect ? parseInt(amount) : (cart[itemId] || 0) + amount;
+    
+    if (isNaN(newQty) || newQty < 0) newQty = 0;
+
+    if (mode === "withdraw" && newQty > item.stock) {
+      alert(`คลังมีสินค้าไม่เพียงพอ (คงเหลือ: ${item.stock} ชิ้น)`);
+      newQty = item.stock;
+    }
     if (mode === "return") {
       const currentlyHolding = myItems.find(i => i.name === item.name)?.qty || 0;
-      if (newQty > currentlyHolding) return alert("Cannot return more than you have");
+      if (newQty > currentlyHolding) {
+        alert(`คุณไม่สามารถคืนของเกินจำนวนที่มีได้ (คุณถืออยู่: ${currentlyHolding} ชิ้น)`);
+        newQty = currentlyHolding;
+      }
     }
     setCart(prev => {
       if (newQty <= 0) { const { [itemId]: _, ...rest } = prev; return rest; }
@@ -298,7 +310,7 @@ export default function Home() {
                   <div className="flex flex-wrap gap-2 justify-center">
                     {myPendingRequests.map((req, idx) => (
                       <div key={idx} className="bg-white px-4 py-2 rounded-xl shadow-sm border border-blue-200 text-[10px] font-bold">
-                        <span className={req.type === 'withdraw' ? 'text-amber-600' : 'text-blue-600'}>{req.type === 'withdraw' ? 'เบิกของ' : 'คืนของ'}</span> : {req.product_name} x{req.amount}
+                        <span className={req.type === 'withdraw' ? 'text-amber-600' : 'text-blue-600'}>{req.type === 'withdraw' ? 'เบิกของ' : 'คืนของ'}</span> : {req.product_name} x {req.amount}
                       </div>
                     ))}
                   </div>
@@ -336,6 +348,7 @@ export default function Home() {
           <div className="grid grid-cols-1 gap-4 pb-20">
             {loading ? <div className="text-center py-20 font-black text-blue-600 uppercase tracking-widest">Loading...</div> : filteredProducts.map((item) => (
               <div key={item.id} className="group relative">
+                {/* มีการส่ง Component Parameter และผูกฟังก์ชัน updateCart ครบถ้วน */}
                 <ItemCard item={item} quantityInCart={cart[item.id] || 0} onUpdate={updateCart} mode={mode} />
                 {isAdmin && (
                   <button onClick={() => { const n = prompt(`Set Stock: ${item.name}`, item.stock); if (n !== null) handleAdminUpdateStock(item.id, n); }} className="absolute top-4 right-4 z-20 bg-white/90 text-[9px] font-black px-3 py-1.5 rounded-xl border border-slate-200 opacity-0 group-hover:opacity-100 transition-all shadow-sm">SET STOCK</button>
@@ -352,11 +365,21 @@ export default function Home() {
         <div className="flex-1 overflow-y-auto space-y-4">
           {Object.entries(cart).map(([id, qty]) => (
             <div key={id} className="flex justify-between items-center bg-slate-50 p-5 rounded-[1.8rem] border border-slate-100 transition-all">
-              <div className="min-w-0 pr-4">
+              <div className="min-w-0 pr-4 flex-1">
                 <p className="font-black text-slate-800 truncate text-sm uppercase italic">{products.find(p => p.id == id)?.name}</p>
                 <p className="text-[9px] text-blue-500 font-black uppercase tracking-widest">{products.find(p => p.id == id)?.category}</p>
               </div>
-              <div className="bg-white px-4 py-2 rounded-xl border border-slate-200 font-black text-blue-600">x{qty}</div>
+              <div className="flex items-center gap-1 bg-white px-3 py-1.5 rounded-xl border border-slate-200">
+                <span className="text-xs font-black text-slate-400">x</span>
+                {/* พิมพ์แก้ไขตัวเลขในแถบตะกร้าสินค้าได้เช่นกัน */}
+                <input 
+                  type="number" 
+                  min="1"
+                  value={qty} 
+                  onChange={(e) => updateCart(id, e.target.value, true)}
+                  className="w-12 text-center font-black text-blue-600 outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                />
+              </div>
             </div>
           ))}
           {Object.keys(cart).length === 0 && <p className="text-center text-slate-300 font-bold py-10 italic text-sm uppercase">Cart is Empty</p>}

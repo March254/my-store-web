@@ -1,53 +1,49 @@
 "use client";
 
 export default function ItemCard({ item, quantityInCart, onUpdate, mode }) {
-  const canAdd = mode === "return" || (mode === "withdraw" && quantityInCart < item.stock);
+  // กำหนดข้อความแสดงจำนวนสูงสุดที่มีสิทธิ์ทำรายการ
+  const maxLabel = mode === "withdraw" ? "คลังคงเหลือ" : "คุณถืออยู่";
+  const maxAvailable = mode === "withdraw" ? item.stock : (item.userHolding || item.stock || 0);
 
   return (
-    <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex items-center gap-4 hover:border-blue-300 transition-all group">
-      
-      {/* รูปภาพอุปกรณ์ */}
-      <div className="w-20 h-20 bg-slate-50 rounded-xl overflow-hidden shrink-0 border border-slate-100 flex items-center justify-center">
-        {item.image_url ? (
-          <img 
-            src={item.image_url} 
-            alt={item.name} 
-            className="w-full h-full object-contain p-1 group-hover:scale-110 transition-transform"
-            onError={(e) => { e.target.src = 'https://via.placeholder.com/150?text=No+Photo'; }}
-          />
-        ) : (
-          <div className="text-slate-300 flex flex-col items-center">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
-            <span className="text-[10px] mt-1 font-bold italic">No Photo</span>
-          </div>
-        )}
-      </div>
-
-      {/* รายละเอียด */}
-      <div className="flex-1 min-w-0">
-        <span className="text-[9px] px-2 py-0.5 bg-blue-50 text-blue-600 rounded-full font-black uppercase tracking-tighter mb-1 inline-block">
-          {item.category || 'GENERAL'}
-        </span>
-        <h2 className="font-bold text-slate-800 text-base truncate uppercase">{item.name}</h2>
-        <p className="text-xs text-slate-500 mt-1 font-medium">
-          คงเหลือ: <span className="text-blue-600 font-black">{item.stock}</span> {item.unit || 'ชิ้น'}
+    <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 hover:shadow-md transition-all">
+      <div className="min-w-0 flex-1">
+        <h3 className="font-black text-slate-800 text-base uppercase italic truncate">{item.name}</h3>
+        <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-1">{item.category}</p>
+        <p className="text-xs font-bold text-slate-400">
+          {maxLabel}: <span className="text-slate-700 font-black">{item.stock}</span> ชิ้น
         </p>
       </div>
 
-      {/* ส่วนปุ่มบวก/ลบ */}
-      <div className="flex items-center gap-2 bg-slate-50 p-1.5 rounded-xl border border-slate-100">
-        <button 
-          onClick={() => onUpdate(item.id, -1)}
-          className="w-8 h-8 flex items-center justify-center bg-white border border-slate-200 rounded-lg font-bold shadow-sm hover:text-red-500 disabled:opacity-20 active:scale-90 transition-all"
-          disabled={quantityInCart === 0}
+      <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-2xl border border-slate-100 w-full sm:w-auto justify-between sm:justify-start">
+        {/* ปุ่มลดจำนวน (-) */}
+        <button
+          type="button"
+          onClick={() => onUpdate(item.id, -1, false)}
+          className="w-10 h-10 rounded-xl bg-white shadow-sm flex items-center justify-center font-black text-slate-600 hover:bg-slate-100 active:scale-95 transition-all"
         >
           -
         </button>
-        <span className="w-6 text-center font-black text-sm text-slate-700">{quantityInCart}</span>
-        <button 
-          onClick={() => onUpdate(item.id, 1)}
-          className={`w-8 h-8 flex items-center justify-center bg-white border border-slate-200 rounded-lg font-bold shadow-sm active:scale-90 transition-all ${canAdd ? 'hover:text-blue-600' : 'opacity-20 cursor-not-allowed'}`}
-          disabled={!canAdd}
+
+        {/* ช่องกรอกตัวเลขโดยตรง (Direct Input) */}
+        <div className="flex items-center justify-center bg-white px-3 h-10 rounded-xl border border-slate-200 min-w-[70px]">
+          <input
+            type="number"
+            min="0"
+            max={item.stock}
+            value={quantityInCart || 0}
+            onChange={(e) => onUpdate(item.id, e.target.value, true)} // ส่งค่า true เพื่อบอกว่าเป็น Direct Input
+            className="w-full text-center font-black text-slate-800 outline-none bg-transparent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+          />
+        </div>
+
+        {/* ปุ่มเพิ่มจำนวน (+) */}
+        <button
+          type="button"
+          onClick={() => onUpdate(item.id, 1, false)}
+          className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-white shadow-md active:scale-95 transition-all ${
+            mode === "withdraw" ? "bg-slate-900 hover:bg-slate-800" : "bg-blue-600 hover:bg-blue-500"
+          }`}
         >
           +
         </button>
