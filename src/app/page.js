@@ -22,66 +22,9 @@ export default function Home() {
   const [allHistory, setAllHistory] = useState([]); 
   const [showHistory, setShowHistory] = useState(false);
   const [showAdminHistory, setShowAdminHistory] = useState(false); 
-  const [importing, setImporting] = useState(false); // สถานะการแอดผู้ใช้
   const router = useRouter();
 
-  // อย่าลืมแอดอีเมลของคุณเองเข้าไปตรงนี้เพื่อสิทธิ์แอดมินนะครับ
-  const ADMIN_EMAILS = ["admin@email.com", "your-email@email.com", "test@example.com"]; 
-
-  // รายชื่ออีเมลนักศึกษาทั้งหมดที่ต้องการแอดเข้าระบบ
-  const STUDENT_EMAILS = [
-    '6931901004@cdti.ac.th','6931901005@cdti.ac.th','6931901006@cdti.ac.th','6931901001@cdti.ac.th',
-    '6931901007@cdti.ac.th','6931901003@cdti.ac.th','6931901008@cdti.ac.th','6931901009@cdti.ac.th',
-    '6821901001@cdti.ac.th','6821901002@cdti.ac.th','6821901004@cdti.ac.th','6821901005@cdti.ac.th',
-    '6821901006@cdti.ac.th','6821901007@cdti.ac.th','6821901008@cdti.ac.th','6821901009@cdti.ac.th',
-    '6821901010@cdti.ac.th','6821901011@cdti.ac.th','6821901012@cdti.ac.th','6821901013@cdti.ac.th',
-    '6821901014@cdti.ac.th','6821901015@cdti.ac.th','6821901019@cdti.ac.th','6821901016@cdti.ac.th',
-    '6821901017@cdti.ac.th','6821901018@cdti.ac.th','6821901020@cdti.ac.th','6821901022@cdti.ac.th',
-    '6821901024@cdti.ac.th','6821901025@cdti.ac.th','6821901026@cdti.ac.th','6821901027@cdti.ac.th',
-    '6821901028@cdti.ac.th','6821901029@cdti.ac.th','6821901030@cdti.ac.th','6821901031@cdti.ac.th',
-    '6821901032@cdti.ac.th','6821901033@cdti.ac.th','6821901034@cdti.ac.th','6921901001@cdti.ac.th',
-    '6921901002@cdti.ac.th','6921901003@cdti.ac.th','6921901004@cdti.ac.th','6921901005@cdti.ac.th',
-    '6921901006@cdti.ac.th','6921901007@cdti.ac.th','6921901008@cdti.ac.th','6921901009@cdti.ac.th',
-    '6921901010@cdti.ac.th','6921901011@cdti.ac.th','6921901012@cdti.ac.th','6921901013@cdti.ac.th',
-    '6921901014@cdti.ac.th','6921901015@cdti.ac.th','6921901016@cdti.ac.th','6921901017@cdti.ac.th',
-    '6921901018@cdti.ac.th','6921901019@cdti.ac.th','6921901020@cdti.ac.th','6921901021@cdti.ac.th',
-    '6921901022@cdti.ac.th','6921901023@cdti.ac.th','6921901024@cdti.ac.th','6921901025@cdti.ac.th',
-    '6921901026@cdti.ac.th','6921901027@cdti.ac.th','6921901028@cdti.ac.th','6921901029@cdti.ac.th',
-    '6921901030@cdti.ac.th','6921901031@cdti.ac.th','6729011001@cdti.ac.th','6729011002@cdti.ac.th',
-    '6729011004@cdti.ac.th','6729011005@cdti.ac.th','6729011006@cdti.ac.th','6729011008@cdti.ac.th',
-    '6729011010@cdti.ac.th','6729011012@cdti.ac.th','6729011013@cdti.ac.th','6729011014@cdti.ac.th',
-    '6729011015@cdti.ac.th','6729011007@cdti.ac.th','6729011009@cdti.ac.th','6729011017@cdti.ac.th',
-    '6729011018@cdti.ac.th','6729011019@cdti.ac.th','6729011020@cdti.ac.th','6729011021@cdti.ac.th',
-    '6729011023@cdti.ac.th','6729011024@cdti.ac.th','6729011025@cdti.ac.th','6729011026@cdti.ac.th',
-    '6831908003@cdti.ac.th','6831908004@cdti.ac.th','6831908005@cdti.ac.th','6831908006@cdti.ac.th',
-    '6831908007@cdti.ac.th','6831908008@cdti.ac.th','6831908011@cdti.ac.th','6831908012@cdti.ac.th',
-    '6831908013@cdti.ac.th','6831908001@cdti.ac.th','6831908002@cdti.ac.th','6831908010@cdti.ac.th'
-  ];
-
-  // ฟังก์ชันสคริปต์วนลูปแอดบัญชีผู้ใช้ทีละคนผ่าน Supabase Auth Client
-  const handleBulkImportUsers = async () => {
-    if (!confirm("คุณต้องการนำเข้ารายชื่อนักศึกษาทั้งหมดใช่หรือไม่?")) return;
-    setImporting(true);
-    let successCount = 0;
-
-    for (const email of STUDENT_EMAILS) {
-      const password = email.split("@")[0]; // ตัดสติงเอาเลขตัวหน้าเมลเป็นรหัสผ่าน
-      
-      // เรียกฟังก์ชันสมัครสมาชิกมาตรฐานของ Supabase
-      const { error } = await supabase.auth.signUp({
-        email: email,
-        password: password,
-        options: {
-          data: { is_student: true } // เผื่อระบุ metadata ไว้แยกประเภท
-        }
-      });
-
-      if (!error) successCount++;
-    }
-
-    setImporting(false);
-    alert(`นำเข้าเรียบร้อยแล้วทั้งหมด ${successCount} รายชื่อ! กรุณาเช็คในตารางหน้าจอ Supabase`);
-  };
+  const ADMIN_EMAILS = ["admin@email.com", "your-email@email.com"]; 
 
   useEffect(() => {
     const checkUser = async () => {
@@ -189,13 +132,24 @@ export default function Home() {
     } catch (e) { alert("Error saving transaction"); }
   };
 
-  const updateCart = (itemId, amount) => {
+  const updateCart = (itemId, amount, isDirect = false) => {
     const item = products.find(p => p.id == itemId);
-    const newQty = (cart[itemId] || 0) + amount;
-    if (mode === "withdraw" && newQty > item.stock) return alert("Not enough stock");
+    if (!item) return;
+
+    let newQty = isDirect ? parseInt(amount) : (cart[itemId] || 0) + amount;
+    
+    if (isNaN(newQty) || newQty < 0) newQty = 0;
+
+    if (mode === "withdraw" && newQty > item.stock) {
+      alert(`คลังมีสินค้าไม่เพียงพอ (คงเหลือ: ${item.stock} ชิ้น)`);
+      newQty = item.stock;
+    }
     if (mode === "return") {
       const currentlyHolding = myItems.find(i => i.name === item.name)?.qty || 0;
-      if (newQty > currentlyHolding) return alert("Cannot return more than you have");
+      if (newQty > currentlyHolding) {
+        alert(`คุณไม่สามารถคืนของเกินจำนวนที่มีได้ (คุณถืออยู่: ${currentlyHolding} ชิ้น)`);
+        newQty = currentlyHolding;
+      }
     }
     setCart(prev => {
       if (newQty <= 0) { const { [itemId]: _, ...rest } = prev; return rest; }
@@ -243,16 +197,6 @@ export default function Home() {
               </div>
             </div>
             <div className="flex gap-2">
-              {/* ปุ่มลับสำหรับบัญชี Admin ในการกดนำเข้าข้อมูลทั้งหมด */}
-              {isAdmin && (
-                <button 
-                  onClick={handleBulkImportUsers} 
-                  disabled={importing}
-                  className="bg-emerald-600 text-white px-4 py-2.5 rounded-xl text-[10px] font-black transition-all hover:bg-emerald-700 disabled:bg-slate-300"
-                >
-                  {importing ? 'IMPORTING...' : '⚡ IMPORT ALL STUDENTS'}
-                </button>
-              )}
               {isAdmin && <button onClick={() => setShowAdminHistory(true)} className="bg-slate-900 text-white px-4 py-2.5 rounded-xl text-[10px] font-black transition-all">ALL HISTORY</button>}
               {!isAdmin && <button onClick={() => setShowHistory(true)} className="bg-blue-50 text-blue-600 px-4 py-2.5 rounded-xl text-[10px] font-black transition-all">MY HISTORY</button>}
               <button onClick={() => supabase.auth.signOut().then(() => router.push('/login'))} className="bg-slate-100 text-slate-900 px-4 py-2.5 rounded-xl text-[10px] font-black transition-all">LOGOUT</button>
@@ -365,7 +309,7 @@ export default function Home() {
                   <div className="flex flex-wrap gap-2 justify-center">
                     {myPendingRequests.map((req, idx) => (
                       <div key={idx} className="bg-white px-4 py-2 rounded-xl shadow-sm border border-blue-200 text-[10px] font-bold">
-                        <span className={req.type === 'withdraw' ? 'text-amber-600' : 'text-blue-600'}>{req.type === 'withdraw' ? 'เบิกของ' : 'คืนของ'}</span> : {req.product_name} x{req.amount}
+                        <span className={req.type === 'withdraw' ? 'text-amber-600' : 'text-blue-600'}>{req.type === 'withdraw' ? 'เบิกของ' : 'คืนของ'}</span> : {req.product_name} x {req.amount}
                       </div>
                     ))}
                   </div>
@@ -417,15 +361,37 @@ export default function Home() {
       <div className="w-full lg:w-96 bg-white border-l p-8 flex flex-col shadow-2xl sticky lg:top-0 h-fit lg:h-screen">
         <h2 className="text-2xl font-black text-slate-800 mb-8 uppercase italic flex items-center gap-3">🛒 Cart <span className="text-blue-600">/</span> {mode === 'withdraw' ? 'เบิกของ' : 'คืนของ'}</h2>
         <div className="flex-1 overflow-y-auto space-y-4">
-          {Object.entries(cart).map(([id, qty]) => (
-            <div key={id} className="flex justify-between items-center bg-slate-50 p-5 rounded-[1.8rem] border border-slate-100 transition-all">
-              <div className="min-w-0 pr-4">
-                <p className="font-black text-slate-800 truncate text-sm uppercase italic">{products.find(p => p.id == id)?.name}</p>
-                <p className="text-[9px] text-blue-500 font-black uppercase tracking-widest">{products.find(p => p.id == id)?.category}</p>
+          {Object.entries(cart).map(([id, qty]) => {
+            const currentItem = products.find(p => p.id == id);
+            return (
+              <div key={id} className="flex justify-between items-center bg-slate-50 p-4 rounded-[1.8rem] border border-slate-100 transition-all gap-3">
+                {/* เพิ่มรูปภาพอุปกรณ์ใน Cart Sidebar */}
+                <div className="w-12 h-12 rounded-xl bg-white border border-slate-200 overflow-hidden flex-shrink-0 flex items-center justify-center">
+                  {currentItem?.image_url ? (
+                    <img src={currentItem.image_url} alt={currentItem?.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="text-xs font-black text-slate-300">No Image</div>
+                  )}
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <p className="font-black text-slate-800 truncate text-sm uppercase italic leading-tight">{currentItem?.name}</p>
+                  <p className="text-[9px] text-blue-500 font-black uppercase tracking-widest">{currentItem?.category}</p>
+                </div>
+                
+                <div className="flex items-center gap-1 bg-white px-2.5 py-1.5 rounded-xl border border-slate-200 flex-shrink-0">
+                  <span className="text-xs font-black text-slate-400">x</span>
+                  <input 
+                    type="number" 
+                    min="1"
+                    value={qty} 
+                    onChange={(e) => updateCart(id, e.target.value, true)}
+                    className="w-10 text-center font-black text-blue-600 outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  />
+                </div>
               </div>
-              <div className="bg-white px-4 py-2 rounded-xl border border-slate-200 font-black text-blue-600">x{qty}</div>
-            </div>
-          ))}
+            );
+          })}
           {Object.keys(cart).length === 0 && <p className="text-center text-slate-300 font-bold py-10 italic text-sm uppercase">Cart is Empty</p>}
         </div>
         <button onClick={handleConfirmAction} disabled={Object.keys(cart).length === 0} className={`w-full py-5 rounded-[2rem] font-black text-white text-lg mt-8 shadow-2xl active:scale-95 transition-all ${Object.keys(cart).length === 0 ? 'bg-slate-100 text-slate-200' : mode === 'withdraw' ? 'bg-slate-900' : 'bg-blue-600'}`}>CONFIRM</button>
