@@ -13,6 +13,7 @@ export default function Home() {
   const [cart, setCart] = useState({});
   const [mode, setMode] = useState("withdraw");
   const [searchTerm, setSearchTerm] = useState("");
+  const [adminSearchTerm, setAdminSearchTerm] = useState(""); // เพิ่ม State สำหรับช่องค้นหาในหน้า All History
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [groupedRequests, setGroupedRequests] = useState({}); 
@@ -175,6 +176,12 @@ export default function Home() {
     (activeCategory === "All" || item.category === activeCategory)
   );
 
+  // ตัวกรองประวัติทั้งหมดสำหรับ Admin (ค้นหาจาก Email หรือ ชื่อสินค้า)
+  const filteredAllHistory = allHistory.filter(log =>
+    log.borrower_name.toLowerCase().includes(adminSearchTerm.toLowerCase()) ||
+    log.product_name.toLowerCase().includes(adminSearchTerm.toLowerCase())
+  );
+
   if (!user) return null;
 
   return (
@@ -203,14 +210,26 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Admin History Modal */}
+          {/* Admin History Modal (ปรับปรุงเพิ่มช่อง Search ด้านบนตาราง) */}
           {showAdminHistory && isAdmin && (
             <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
               <div className="bg-white w-full max-w-4xl rounded-[2.5rem] shadow-2xl flex flex-col max-h-[85vh] overflow-hidden">
                 <div className="p-8 border-b flex justify-between items-center bg-slate-900 text-white">
                   <h2 className="text-xl font-black uppercase tracking-tighter">Global Transaction Log</h2>
-                  <button onClick={() => setShowAdminHistory(false)} className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center font-black hover:bg-white/20 transition-all text-white">✕</button>
+                  <button onClick={() => { setShowAdminHistory(false); setAdminSearchTerm(""); }} className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center font-black hover:bg-white/20 transition-all text-white">✕</button>
                 </div>
+                
+                {/* ช่องกรอกเพื่อเสิร์ชรายชื่อ หรือ ของที่เบิกในหน้า All History */}
+                <div className="p-4 bg-slate-50 border-b">
+                  <input 
+                    type="text" 
+                    placeholder="ค้นหาด้วยอีเมลนักศึกษา หรือชื่ออุปกรณ์ที่เบิก..." 
+                    value={adminSearchTerm} 
+                    onChange={(e) => setAdminSearchTerm(e.target.value)} 
+                    className="w-full p-4 bg-white border border-slate-200 rounded-2xl shadow-sm outline-none font-bold text-sm focus:ring-4 focus:ring-blue-50" 
+                  />
+                </div>
+
                 <div className="flex-1 overflow-y-auto p-6 space-y-2">
                   <div className="grid grid-cols-12 gap-4 px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b mb-4">
                     <div className="col-span-3">User</div>
@@ -219,7 +238,7 @@ export default function Home() {
                     <div className="col-span-2 text-center">Type</div>
                     <div className="col-span-2 text-right">Date/Time</div>
                   </div>
-                  {allHistory.map((log) => (
+                  {filteredAllHistory.map((log) => (
                     <div key={log.id} className="grid grid-cols-12 gap-4 px-4 py-4 rounded-xl border border-slate-50 hover:bg-slate-50 transition-all items-center text-xs">
                       <div className="col-span-3 font-bold text-slate-500 truncate">{log.borrower_name}</div>
                       <div className="col-span-4 font-black text-slate-800 uppercase truncate">{log.product_name}</div>
@@ -234,6 +253,9 @@ export default function Home() {
                       </div>
                     </div>
                   ))}
+                  {filteredAllHistory.length === 0 && (
+                    <p className="text-center text-slate-400 font-bold py-10 italic text-sm uppercase">ไม่พบข้อมูลประวัติที่ค้นหา</p>
+                  )}
                 </div>
               </div>
             </div>
@@ -365,7 +387,6 @@ export default function Home() {
             const currentItem = products.find(p => p.id == id);
             return (
               <div key={id} className="flex justify-between items-center bg-slate-50 p-4 rounded-[1.8rem] border border-slate-100 transition-all gap-3">
-                {/* เพิ่มรูปภาพอุปกรณ์ใน Cart Sidebar */}
                 <div className="w-12 h-12 rounded-xl bg-white border border-slate-200 overflow-hidden flex-shrink-0 flex items-center justify-center">
                   {currentItem?.image_url ? (
                     <img src={currentItem.image_url} alt={currentItem?.name} className="w-full h-full object-cover" />
