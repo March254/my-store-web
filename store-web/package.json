@@ -13,7 +13,8 @@
     "@tailwindcss/postcss": "^4.2.4",
     "next": "latest",
     "react": "latest",
-    "react-dom": "latest"
+    "react-dom": "latest",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "autoprefixer": "latest",

@@ -203,8 +203,19 @@ export default function Home() {
                 </div>
               </div>
             </div>
-            <div className="flex gap-2">
-              {isAdmin && <button onClick={() => setShowAdminHistory(true)} className="bg-slate-900 text-white px-4 py-2.5 rounded-xl text-[10px] font-black transition-all">ALL HISTORY</button>}
+<div className="flex gap-2">
+              {isAdmin && (
+                <>
+                  {/* ปุ่มเพิ่มใหม่สำหรับไปหน้า Excel */}
+                  <button 
+                    onClick={() => router.push('/admin')} 
+                    className="bg-emerald-600 text-white px-4 py-2.5 rounded-xl text-[10px] font-black transition-all shadow-md active:scale-95"
+                  >
+                    IMPORT EXCEL
+                  </button>
+                  <button onClick={() => setShowAdminHistory(true)} className="bg-slate-900 text-white px-4 py-2.5 rounded-xl text-[10px] font-black transition-all">ALL HISTORY</button>
+                </>
+              )}
               {!isAdmin && <button onClick={() => setShowHistory(true)} className="bg-blue-50 text-blue-600 px-4 py-2.5 rounded-xl text-[10px] font-black transition-all">MY HISTORY</button>}
               <button onClick={() => supabase.auth.signOut().then(() => router.push('/login'))} className="bg-slate-100 text-slate-900 px-4 py-2.5 rounded-xl text-[10px] font-black transition-all">LOGOUT</button>
             </div>
