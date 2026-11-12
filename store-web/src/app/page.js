@@ -213,6 +213,13 @@ export default function Home() {
                   >
                     IMPORT EXCEL
                   </button>
+                  {/* ปุ่มแจ้งอุปกรณ์เสียที่เพิ่มใหม่ */}
+                  <button
+                  onClick={() => router.push('/admin/damaged')}
+                  className="bg-red-600 text-white px-4 py-2.5 rounded-xl text-[10px] font-black transition-all shadow-md active:scale-95"
+                  >
+                  REPORT DAMAGED
+                  </button>
                   <button onClick={() => setShowAdminHistory(true)} className="bg-slate-900 text-white px-4 py-2.5 rounded-xl text-[10px] font-black transition-all">ALL HISTORY</button>
                 </>
               )}
