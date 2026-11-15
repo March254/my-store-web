@@ -12,8 +12,9 @@ export default function Home() {
   const [borrower, setBorrower] = useState("");
   const [cart, setCart] = useState({});
   const [mode, setMode] = useState("withdraw");
+  const [returnDate, setReturnDate] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
-  const [adminSearchTerm, setAdminSearchTerm] = useState(""); // เพิ่ม State สำหรับช่องค้นหาในหน้า All History
+  const [adminSearchTerm, setAdminSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [groupedRequests, setGroupedRequests] = useState({}); 
@@ -78,14 +79,21 @@ export default function Home() {
   };
 
   const fetchMyBorrowedItems = async (email) => {
-    const { data } = await supabase.from('transaction_logs').select('*').eq('borrower_name', email);
+    const { data } = await supabase.from('transaction_logs').select('*').eq('borrower_name', email).order('created_at', { ascending: true });
     if (data) {
       const summary = data.reduce((acc, log) => {
-        const qty = log.type === 'withdraw' ? log.amount : -log.amount;
-        acc[log.product_name] = (acc[log.product_name] || 0) + qty;
+        if (!acc[log.product_name]) acc[log.product_name] = { qty: 0, return_date: null };
+        acc[log.product_name].qty += (log.type === 'withdraw' ? log.amount : -log.amount);
+        if (log.type === 'withdraw' && log.return_date) {
+          acc[log.product_name].return_date = log.return_date;
+        }
         return acc;
       }, {});
-      setMyItems(Object.entries(summary).filter(([_, qty]) => qty > 0).map(([name, qty]) => ({ name, qty })));
+      setMyItems(
+        Object.entries(summary)
+          .filter(([_, info]) => info.qty > 0)
+          .map(([name, info]) => ({ name, qty: info.qty, return_date: info.return_date }))
+      );
     }
   };
 
@@ -123,8 +131,12 @@ export default function Home() {
           const newStock = req.type === 'withdraw' ? item.stock - req.amount : item.stock + req.amount;
           await supabase.from('products').update({ stock: newStock }).eq('id', req.product_id);
           await supabase.from('transaction_logs').insert([{
-            product_id: req.product_id, product_name: req.product_name,
-            amount: req.amount, borrower_name: req.borrower_name, type: req.type
+            product_id: req.product_id, 
+            product_name: req.product_name,
+            amount: req.amount, 
+            borrower_name: req.borrower_name, 
+            type: req.type,
+            return_date: req.return_date || null
           }]);
         }
         await supabase.from('borrow_requests').update({ status: decision }).eq('id', req.id);
@@ -160,13 +172,24 @@ export default function Home() {
 
   const handleConfirmAction = async () => {
     if (Object.keys(cart).length === 0) return;
+    if (mode === "withdraw" && !returnDate) {
+      return alert("กรุณาระบุวันและเวลาที่กำหนดคืนอุปกรณ์ก่อนกดยืนยัน");
+    }
+
     const groupId = `GRP-${Date.now()}`;
     const inserts = Object.entries(cart).map(([id, qty]) => ({
-      product_id: id, product_name: products.find(p => p.id == id).name,
-      amount: qty, borrower_name: borrower, type: mode, status: 'pending', group_id: groupId
+      product_id: id, 
+      product_name: products.find(p => p.id == id).name,
+      amount: qty, 
+      borrower_name: borrower, 
+      type: mode, 
+      status: 'pending', 
+      group_id: groupId,
+      return_date: mode === "withdraw" ? returnDate : null
     }));
     await supabase.from('borrow_requests').insert(inserts);
     setCart({});
+    setReturnDate("");
     fetchMyPendingRequests(user.email);
     alert("Request sent successfully!");
   };
@@ -176,7 +199,6 @@ export default function Home() {
     (activeCategory === "All" || item.category === activeCategory)
   );
 
-  // ตัวกรองประวัติทั้งหมดสำหรับ Admin (ค้นหาจาก Email หรือ ชื่อสินค้า)
   const filteredAllHistory = allHistory.filter(log =>
     log.borrower_name.toLowerCase().includes(adminSearchTerm.toLowerCase()) ||
     log.product_name.toLowerCase().includes(adminSearchTerm.toLowerCase())
@@ -203,22 +225,20 @@ export default function Home() {
                 </div>
               </div>
             </div>
-<div className="flex gap-2">
+            <div className="flex gap-2">
               {isAdmin && (
                 <>
-                  {/* ปุ่มเพิ่มใหม่สำหรับไปหน้า Excel */}
                   <button 
                     onClick={() => router.push('/admin')} 
                     className="bg-emerald-600 text-white px-4 py-2.5 rounded-xl text-[10px] font-black transition-all shadow-md active:scale-95"
                   >
                     IMPORT EXCEL
                   </button>
-                  {/* ปุ่มแจ้งอุปกรณ์เสียที่เพิ่มใหม่ */}
                   <button
-                  onClick={() => router.push('/admin/damaged')}
-                  className="bg-red-600 text-white px-4 py-2.5 rounded-xl text-[10px] font-black transition-all shadow-md active:scale-95"
+                    onClick={() => router.push('/admin/damaged')}
+                    className="bg-red-600 text-white px-4 py-2.5 rounded-xl text-[10px] font-black transition-all shadow-md active:scale-95"
                   >
-                  REPORT DAMAGED
+                    REPORT DAMAGED
                   </button>
                   <button onClick={() => setShowAdminHistory(true)} className="bg-slate-900 text-white px-4 py-2.5 rounded-xl text-[10px] font-black transition-all">ALL HISTORY</button>
                 </>
@@ -228,7 +248,7 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Admin History Modal (ปรับปรุงเพิ่มช่อง Search ด้านบนตาราง) */}
+          {/* Admin History Modal */}
           {showAdminHistory && isAdmin && (
             <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
               <div className="bg-white w-full max-w-4xl rounded-[2.5rem] shadow-2xl flex flex-col max-h-[85vh] overflow-hidden">
@@ -237,7 +257,6 @@ export default function Home() {
                   <button onClick={() => { setShowAdminHistory(false); setAdminSearchTerm(""); }} className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center font-black hover:bg-white/20 transition-all text-white">✕</button>
                 </div>
                 
-                {/* ช่องกรอกเพื่อเสิร์ชรายชื่อ หรือ ของที่เบิกในหน้า All History */}
                 <div className="p-4 bg-slate-50 border-b">
                   <input 
                     type="text" 
@@ -259,11 +278,18 @@ export default function Home() {
                   {filteredAllHistory.map((log) => (
                     <div key={log.id} className="grid grid-cols-12 gap-4 px-4 py-4 rounded-xl border border-slate-50 hover:bg-slate-50 transition-all items-center text-xs">
                       <div className="col-span-3 font-bold text-slate-500 truncate">{log.borrower_name}</div>
-                      <div className="col-span-4 font-black text-slate-800 uppercase truncate">{log.product_name}</div>
+                      <div className="col-span-4 font-black text-slate-800 uppercase truncate">
+                        {log.product_name}
+                        {log.return_date && (
+                          <span className="block text-[9px] font-bold text-amber-600 mt-0.5">
+                            กำหนดคืน: {new Date(log.return_date).toLocaleString('th-TH', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        )}
+                      </div>
                       <div className="col-span-1 text-center font-black text-blue-600">x{log.amount}</div>
                       <div className="col-span-2 text-center">
-                        <span className={`text-[9px] font-black px-2 py-1 rounded-md uppercase ${log.type === 'withdraw' ? 'bg-amber-100 text-amber-600' : 'bg-blue-100 text-blue-600'}`}>
-                          {log.type === 'withdraw' ? 'เบิกของ' : 'คืนของ'}
+                        <span className={`text-[9px] font-black px-2 py-1 rounded-md uppercase ${log.type === 'withdraw' ? 'bg-amber-100 text-amber-600' : log.type === 'damaged' ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'}`}>
+                          {log.type === 'withdraw' ? 'เบิกของ' : log.type === 'damaged' ? 'ชำรุด' : 'คืนของ'}
                         </span>
                       </div>
                       <div className="col-span-2 text-right text-[9px] font-bold text-slate-400 leading-tight">
@@ -295,6 +321,11 @@ export default function Home() {
                         <span className="text-[10px] font-bold text-slate-400">
                           {new Date(log.created_at).toLocaleString('th-TH', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                         </span>
+                        {log.return_date && (
+                          <span className="text-[10px] font-bold text-amber-600 mt-0.5">
+                            กำหนดคืน: {new Date(log.return_date).toLocaleString('th-TH', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        )}
                       </div>
                       <div className="flex items-center gap-4">
                         <span className={`text-[10px] font-black px-3 py-1 rounded-full uppercase ${log.type === 'withdraw' ? 'bg-amber-100 text-amber-600' : 'bg-blue-100 text-blue-600'}`}>
@@ -320,6 +351,11 @@ export default function Home() {
                       <div>
                         <h3 className="font-black text-slate-800 uppercase text-lg tracking-tighter">Order #{groupId.slice(-5)}</h3>
                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{items[0].borrower_name}</p>
+                        {items[0].return_date && (
+                          <p className="text-[10px] font-black text-amber-600 mt-1">
+                            📅 กำหนดคืน: {new Date(items[0].return_date).toLocaleString('th-TH', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          </p>
+                        )}
                       </div>
                       <div className="flex gap-2">
                         <button onClick={() => handleDecideGroup(groupId, 'approved')} className="bg-blue-600 text-white px-6 py-3 rounded-xl text-[10px] font-black shadow-lg active:scale-95 transition-all">APPROVE</button>
@@ -357,12 +393,17 @@ export default function Home() {
               )}
               {myItems.length > 0 && (
                 <div className="mb-10 bg-slate-900 p-8 rounded-[2.5rem] shadow-xl text-white text-center">
-                  <h2 className="text-[10px] font-black mb-4 uppercase text-slate-400 tracking-widest">📦 My Inventory</h2>
+                  <h2 className="text-[10px] font-black mb-4 uppercase text-slate-400 tracking-widest">📦 My Inventory (ยังไม่คืน)</h2>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                     {myItems.map((item, idx) => (
                       <div key={idx} className="bg-white/10 p-4 rounded-2xl border border-white/10">
                         <p className="font-black text-xs truncate uppercase tracking-tighter">{item.name}</p>
                         <p className="text-blue-400 font-black text-xl italic">x{item.qty}</p>
+                        {item.return_date && (
+                          <p className="text-[9px] text-amber-300 font-bold mt-1">
+                            คืน: {new Date(item.return_date).toLocaleString('th-TH', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                          </p>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -433,7 +474,23 @@ export default function Home() {
           })}
           {Object.keys(cart).length === 0 && <p className="text-center text-slate-300 font-bold py-10 italic text-sm uppercase">Cart is Empty</p>}
         </div>
-        <button onClick={handleConfirmAction} disabled={Object.keys(cart).length === 0} className={`w-full py-5 rounded-[2rem] font-black text-white text-lg mt-8 shadow-2xl active:scale-95 transition-all ${Object.keys(cart).length === 0 ? 'bg-slate-100 text-slate-200' : mode === 'withdraw' ? 'bg-slate-900' : 'bg-blue-600'}`}>CONFIRM</button>
+
+        {/* ช่องกำหนดวันเวลาคืน (แสดงเฉพาะตอนเบิกของและมีของในตะกร้า) */}
+        {mode === 'withdraw' && Object.keys(cart).length > 0 && (
+          <div className="mt-6 bg-amber-50/70 p-4 rounded-2xl border border-amber-200/80">
+            <label className="block text-[10px] font-black uppercase tracking-widest text-amber-800 mb-2">
+              📅 กำหนดวันและเวลาส่งคืน *
+            </label>
+            <input
+              type="datetime-local"
+              value={returnDate}
+              onChange={(e) => setReturnDate(e.target.value)}
+              className="w-full p-3 bg-white border border-amber-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-amber-400"
+            />
+          </div>
+        )}
+
+        <button onClick={handleConfirmAction} disabled={Object.keys(cart).length === 0} className={`w-full py-5 rounded-[2rem] font-black text-white text-lg mt-4 shadow-2xl active:scale-95 transition-all ${Object.keys(cart).length === 0 ? 'bg-slate-100 text-slate-200' : mode === 'withdraw' ? 'bg-slate-900' : 'bg-blue-600'}`}>CONFIRM</button>
       </div>
     </main>
   );
