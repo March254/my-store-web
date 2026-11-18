@@ -241,6 +241,12 @@ export default function Home() {
                     REPORT DAMAGED
                   </button>
                   <button onClick={() => setShowAdminHistory(true)} className="bg-slate-900 text-white px-4 py-2.5 rounded-xl text-[10px] font-black transition-all">ALL HISTORY</button>
+                  <button
+                    onClick={() => router.push('/admin/settings')}
+                    className="bg-blue-600 text-white px-4 py-2.5 rounded-xl text-[10px] font-black transition-all shadow-md active:scale-95"
+                  >
+                    SETTINGS
+                  </button>
                 </>
               )}
               {!isAdmin && <button onClick={() => setShowHistory(true)} className="bg-blue-50 text-blue-600 px-4 py-2.5 rounded-xl text-[10px] font-black transition-all">MY HISTORY</button>}
