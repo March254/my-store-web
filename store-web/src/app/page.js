@@ -10,6 +10,8 @@ export default function Home() {
   const [categories, setCategories] = useState([]);
   const [activeCategory, setActiveCategory] = useState("All");
   const [borrower, setBorrower] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [isEditingName, setIsEditingName] = useState(false);
   const [cart, setCart] = useState({});
   const [mode, setMode] = useState("withdraw");
   const [returnDate, setReturnDate] = useState("");
@@ -29,22 +31,40 @@ export default function Home() {
   const ADMIN_EMAILS = ["admin@email.com", "your-email@email.com"]; 
 
   useEffect(() => {
-    const checkUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        router.push('/login');
-      } else {
-        setUser(user);
-        setBorrower(user.email);
-        const adminStatus = ADMIN_EMAILS.map(e => e.toLowerCase()).includes(user.email.toLowerCase());
-        setIsAdmin(adminStatus);
-        fetchData(user.email, adminStatus);
-      }
-    };
-    checkUser();
-    const interval = setInterval(() => { if (user) fetchData(user.email, isAdmin); }, 10000);
-    return () => clearInterval(interval);
-  }, [user, isAdmin]);
+  const checkUser = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      router.push('/login');
+    } else {
+      setUser(user);
+      setBorrower(user.email);
+      setFullName(user.user_metadata?.full_name || "");
+      const adminStatus = ADMIN_EMAILS.map(e => e.toLowerCase()).includes(user.email.toLowerCase());
+      setIsAdmin(adminStatus);
+      fetchData(user.email, adminStatus);
+    }
+  };
+  checkUser();
+}, []);
+
+useEffect(() => {
+  if (!user) return;
+  const interval = setInterval(() => {
+    fetchData(user.email, isAdmin);
+  }, 10000);
+  return () => clearInterval(interval);
+}, [user?.email, isAdmin]);
+
+  const handleSaveFullName = async () => {
+  if (!fullName.trim()) return alert("กรุณากรอกชื่อ-นามสกุล");
+  const { data, error } = await supabase.auth.updateUser({
+    data: { full_name: fullName.trim() }
+  });
+  if (error) return alert("บันทึกชื่อไม่สำเร็จ: " + error.message);
+  setUser(data.user);
+  setIsEditingName(false);
+  alert("บันทึกชื่อ-นามสกุลเรียบร้อยแล้ว");
+};
 
   const fetchData = async (email, adminStatus) => {
     fetchProducts();
@@ -69,7 +89,7 @@ export default function Home() {
   };
 
   const fetchUserHistory = async (email) => {
-    const { data } = await supabase.from('transaction_logs').select('*').eq('borrower_name', email).order('created_at', { ascending: false });
+    const { data } = await supabase.from('transaction_logs').select('*').ilike('borrower_name', `%${email}%`).order('created_at', { ascending: false });
     if (data) setHistory(data);
   };
 
@@ -79,7 +99,7 @@ export default function Home() {
   };
 
   const fetchMyBorrowedItems = async (email) => {
-    const { data } = await supabase.from('transaction_logs').select('*').eq('borrower_name', email).order('created_at', { ascending: true });
+    const { data } = await supabase.from('transaction_logs').select('*').ilike('borrower_name', `%${email}%`).order('created_at', { ascending: true });
     if (data) {
       const summary = data.reduce((acc, log) => {
         if (!acc[log.product_name]) acc[log.product_name] = { qty: 0, return_date: null };
@@ -98,7 +118,7 @@ export default function Home() {
   };
 
   const fetchMyPendingRequests = async (email) => {
-    const { data } = await supabase.from('borrow_requests').select('*').eq('borrower_name', email).eq('status', 'pending');
+    const { data } = await supabase.from('borrow_requests').select('*').ilike('borrower_name', `%${email}%`).eq('status', 'pending');
     if (data) setMyPendingRequests(data);
   };
 
@@ -176,12 +196,13 @@ export default function Home() {
       return alert("กรุณาระบุวันและเวลาที่กำหนดคืนอุปกรณ์ก่อนกดยืนยัน");
     }
 
+    const borrowerDisplay = fullName.trim() ? `${fullName.trim()} (${user.email})` : user.email;
     const groupId = `GRP-${Date.now()}`;
     const inserts = Object.entries(cart).map(([id, qty]) => ({
       product_id: id, 
       product_name: products.find(p => p.id == id).name,
       amount: qty, 
-      borrower_name: borrower, 
+      borrower_name: borrowerDisplay, 
       type: mode, 
       status: 'pending', 
       group_id: groupId,
@@ -222,9 +243,49 @@ export default function Home() {
                 <div className="flex flex-col">
                   <p className="text-[10px] font-black uppercase text-blue-600 tracking-widest leading-tight">{isAdmin ? 'ADMIN PANEL' : 'USER DASHBOARD'}</p>
                   <p className="text-[9px] font-bold text-slate-400 truncate max-w-[150px]">{user?.email}</p>
+                  
+                  {/* <--- วางโค้ดส่วนนี้ต่อจากบรรทัดที่ 238 */}
+                  {!isAdmin && (
+                    <div className="mt-1 flex items-center gap-1.5">
+                      {isEditingName ? (
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="text"
+                            placeholder="ชื่อ-นามสกุล..."
+                            value={fullName}
+                            onChange={(e) => setFullName(e.target.value)}
+                            className="px-2 py-0.5 text-[10px] font-bold border border-blue-300 rounded-md outline-none w-36"
+                          />
+                          <button
+                            onClick={handleSaveFullName}
+                            className="bg-blue-600 text-white px-2 py-0.5 rounded-md text-[9px] font-black"
+                          >
+                            บันทึก
+                          </button>
+                          <button
+                            onClick={() => {
+                              setFullName(user?.user_metadata?.full_name || "");
+                              setIsEditingName(false);
+                            }}
+                            className="bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded-md text-[9px] font-black"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setIsEditingName(true)}
+                          className="text-[10px] font-bold text-slate-600 hover:text-blue-600 flex items-center gap-1 bg-slate-100 px-2 py-0.5 rounded-md"
+                        >
+                          <span>👤 {fullName || "คลิกเพื่อตั้งชื่อ-นามสกุล"}</span>
+                          <span className="text-[9px] text-blue-600 underline">แก้ไข</span>
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
                 </div>
               </div>
-            </div>
             <div className="flex gap-2">
               {isAdmin && (
                 <>
