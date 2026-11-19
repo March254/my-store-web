@@ -12,6 +12,8 @@ export default function Home() {
   const [borrower, setBorrower] = useState("");
   const [fullName, setFullName] = useState("");
   const [isEditingName, setIsEditingName] = useState(false);
+  const [studentYear, setStudentYear] = useState("");
+  const [studentRoom, setStudentRoom] = useState("");
   const [cart, setCart] = useState({});
   const [mode, setMode] = useState("withdraw");
   const [returnDate, setReturnDate] = useState("");
@@ -39,6 +41,8 @@ export default function Home() {
       setUser(user);
       setBorrower(user.email);
       setFullName(user.user_metadata?.full_name || "");
+      setStudentYear(user.user_metadata?.student_year || "");
+      setStudentRoom(user.user_metadata?.student_room || "");
       const adminStatus = ADMIN_EMAILS.map(e => e.toLowerCase()).includes(user.email.toLowerCase());
       setIsAdmin(adminStatus);
       fetchData(user.email, adminStatus);
@@ -55,16 +59,20 @@ useEffect(() => {
   return () => clearInterval(interval);
 }, [user?.email, isAdmin]);
 
-  const handleSaveFullName = async () => {
-  if (!fullName.trim()) return alert("กรุณากรอกชื่อ-นามสกุล");
-  const { data, error } = await supabase.auth.updateUser({
-    data: { full_name: fullName.trim() }
-  });
-  if (error) return alert("บันทึกชื่อไม่สำเร็จ: " + error.message);
-  setUser(data.user);
-  setIsEditingName(false);
-  alert("บันทึกชื่อ-นามสกุลเรียบร้อยแล้ว");
-};
+const handleSaveFullName = async () => {
+    if (!fullName.trim()) return alert("กรุณากรอกชื่อ-นามสกุล");
+    const { data, error } = await supabase.auth.updateUser({
+      data: { 
+        full_name: fullName.trim(),
+        student_year: studentYear.trim(),
+        student_room: studentRoom.trim()
+      }
+    });
+    if (error) return alert("บันทึกข้อมูลไม่สำเร็จ: " + error.message);
+    setUser(data.user);
+    setIsEditingName(false);
+    alert("บันทึกข้อมูลส่วนตัวเรียบร้อยแล้ว");
+  };
 
   const fetchData = async (email, adminStatus) => {
     fetchProducts();
@@ -196,7 +204,17 @@ useEffect(() => {
       return alert("กรุณาระบุวันและเวลาที่กำหนดคืนอุปกรณ์ก่อนกดยืนยัน");
     }
 
-    const borrowerDisplay = fullName.trim() ? `${fullName.trim()} (${user.email})` : user.email;
+    if (mode === "withdraw" && !isAdmin && (!studentYear.trim() || !studentRoom.trim())) {
+      return alert("กรุณากรอกชั้นปีและห้องที่นำไปใช้ก่อนกดยืนยัน");
+    }
+    const extraInfo = [
+      studentYear.trim() ? `ชั้นปี ${studentYear.trim()}` : "",
+      studentRoom.trim() ? `ห้อง ${studentRoom.trim()}` : ""
+    ].filter(Boolean).join(" ");
+
+    const borrowerDisplay = fullName.trim()
+      ? `${fullName.trim()}${extraInfo ? ` (${extraInfo})` : ""} - ${user.email}`
+      : user.email;
     const groupId = `GRP-${Date.now()}`;
     const inserts = Object.entries(cart).map(([id, qty]) => ({
       product_id: id, 
@@ -541,7 +559,35 @@ useEffect(() => {
           })}
           {Object.keys(cart).length === 0 && <p className="text-center text-slate-300 font-bold py-10 italic text-sm uppercase">Cart is Empty</p>}
         </div>
-
+        {/* ช่องกรอกชั้นปี และ ห้องที่นำไปใช้ (แสดงเฉพาะ User ตอนเบิกของ) */}
+        {!isAdmin && mode === 'withdraw' && Object.keys(cart).length > 0 && (
+          <div className="mt-4 bg-blue-50/70 p-4 rounded-2xl border border-blue-200/80 grid grid-cols-2 gap-2.5">
+            <div>
+              <label className="block text-[10px] font-black uppercase tracking-widest text-blue-800 mb-1.5">
+                🎓 ชั้นปี *
+              </label>
+              <input
+                type="text"
+                placeholder="เช่น 3"
+                value={studentYear}
+                onChange={(e) => setStudentYear(e.target.value)}
+                className="w-full p-2.5 bg-white border border-blue-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-400"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-black uppercase tracking-widest text-blue-800 mb-1.5">
+                🏫 ห้องที่นำไปใช้ *
+              </label>
+              <input
+                type="text"
+                placeholder="เช่น 402"
+                value={studentRoom}
+                onChange={(e) => setStudentRoom(e.target.value)}
+                className="w-full p-2.5 bg-white border border-blue-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-400"
+              />
+            </div>
+          </div>
+        )}
         {/* ช่องกำหนดวันเวลาคืน (แสดงเฉพาะตอนเบิกของและมีของในตะกร้า) */}
         {mode === 'withdraw' && Object.keys(cart).length > 0 && (
           <div className="mt-6 bg-amber-50/70 p-4 rounded-2xl border border-amber-200/80">
