@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 
 export default function AdminSettingsPage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState("products"); // products | users | history
+  const [activeTab, setActiveTab] = useState("products"); // products | users | history | stock_date
   const [loading, setLoading] = useState(true);
 
   // 1. State จัดการอุปกรณ์
@@ -22,6 +22,12 @@ export default function AdminSettingsPage() {
   const [logs, setLogs] = useState([]);
   const [logSearchText, setLogSearchText] = useState("");
   const [logSearchDate, setLogSearchDate] = useState(""); // รูปแบบ YYYY-MM-DD
+
+  // 4. State เช็กสต็อกย้อนหลังตาม วัน/เดือน/ปี
+  const [stockCheckDate, setStockCheckDate] = useState(() => {
+    return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" });
+  });
+  const [stockCheckSearch, setStockCheckSearch] = useState("");
 
   // อีเมลแอดมิน (ให้ตรงกับหน้าหลัก)
   const ADMIN_EMAILS = ["admin@email.com", "your-email@email.com"];
@@ -124,12 +130,79 @@ export default function AdminSettingsPage() {
 
     let matchDate = true;
     if (logSearchDate) {
-      // แปลง created_at เป็นวันที่ตามเวลาไทย (YYYY-MM-DD)
       const logDateLocal = new Date(log.created_at).toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" });
       matchDate = logDateLocal === logSearchDate;
     }
     return matchText && matchDate;
   });
+
+  // --- คำนวณยอดอุปกรณ์ย้อนหลัง ณ สิ้นวันที่เลือก ---
+  const stockSnapshotList = products
+    .filter(item =>
+      item.name.toLowerCase().includes(stockCheckSearch.toLowerCase()) ||
+      (item.category || "").toLowerCase().includes(stockCheckSearch.toLowerCase())
+    )
+    .map(item => {
+      let stockAtEndOfDate = item.stock;
+      let withdrawnOnDate = 0;
+      let returnedOnDate = 0;
+      let damagedOnDate = 0;
+
+      logs.forEach(log => {
+        const isSameProduct =
+          (log.product_id && String(log.product_id) === String(item.id)) ||
+          log.product_name === item.name;
+        if (!isSameProduct) return;
+
+        const logDateLocal = new Date(log.created_at).toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" });
+
+        // รายการที่เกิดขึ้น "หลังจาก" วันที่เลือก -> ย้อนกลับค่าให้เป็นสภาพ ณ สิ้นวันที่เลือก
+        if (stockCheckDate && logDateLocal > stockCheckDate) {
+          if (log.type === "withdraw" || log.type === "damaged") {
+            stockAtEndOfDate += log.amount;
+          } else if (log.type === "return") {
+            stockAtEndOfDate -= log.amount;
+          }
+        }
+
+        // สรุปความเคลื่อนไหวที่เกิดขึ้น "ภายในวันนั้น"
+        if (stockCheckDate && logDateLocal === stockCheckDate) {
+          if (log.type === "withdraw") withdrawnOnDate += log.amount;
+          if (log.type === "return") returnedOnDate += log.amount;
+          if (log.type === "damaged") damagedOnDate += log.amount;
+        }
+      });
+
+      return {
+        ...item,
+        stockAtEndOfDate: Math.max(0, stockAtEndOfDate),
+        withdrawnOnDate,
+        returnedOnDate,
+        damagedOnDate
+      };
+    });
+
+  // ฟังก์ชัน Export CSV ยอดอุปกรณ์ตามวันที่เลือก
+  const handleExportStockSnapshotCSV = () => {
+    const headers = ["ชื่ออุปกรณ์", "หมวดหมู่", `คงเหลือ ณ วันที่ ${stockCheckDate}`, "เบิกออกในวันนั้น", "รับคืนในวันนั้น", "ชำรุดในวันนั้น", "คงเหลือปัจจุบัน"];
+    const rows = stockSnapshotList.map(item => [
+      `"${item.name.replace(/"/g, '""')}"`,
+      `"${(item.category || "ทั่วไป").replace(/"/g, '""')}"`,
+      item.stockAtEndOfDate,
+      item.withdrawnOnDate,
+      item.returnedOnDate,
+      item.damagedOnDate,
+      item.stock
+    ]);
+    const csvContent = "\uFEFF" + [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `stock-report-${stockCheckDate}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center font-black text-blue-600">LOADING SETTINGS...</div>;
@@ -145,7 +218,7 @@ export default function AdminSettingsPage() {
             <h1 className="text-2xl font-black uppercase tracking-tighter">
               Admin <span className="text-blue-600">Settings</span>
             </h1>
-            <p className="text-xs font-bold text-slate-400">จัดการอุปกรณ์ รายชื่อผู้ใช้ และค้นหาประวัติแบบละเอียด</p>
+            <p className="text-xs font-bold text-slate-400">จัดการอุปกรณ์ รายชื่อผู้ใช้ และตรวจสอบสต็อกย้อนหลังตามวันที่</p>
           </div>
           <button
             onClick={() => router.push("/")}
@@ -156,18 +229,26 @@ export default function AdminSettingsPage() {
         </div>
 
         {/* Navigation Tabs */}
-        <div className="flex bg-white p-1.5 rounded-2xl border border-slate-200 mb-8 shadow-sm gap-2">
+        <div className="grid grid-cols-2 lg:grid-cols-4 bg-white p-1.5 rounded-2xl border border-slate-200 mb-8 shadow-sm gap-2">
           <button
             onClick={() => setActiveTab("products")}
-            className={`flex-1 py-3.5 rounded-xl font-black text-xs uppercase transition-all ${
+            className={`py-3.5 px-2 rounded-xl font-black text-xs uppercase transition-all ${
               activeTab === "products" ? "bg-blue-600 text-white shadow-md" : "text-slate-500 hover:bg-slate-50"
             }`}
           >
             📦 จัดการอุปกรณ์ ({products.length})
           </button>
           <button
+            onClick={() => setActiveTab("stock_date")}
+            className={`py-3.5 px-2 rounded-xl font-black text-xs uppercase transition-all ${
+              activeTab === "stock_date" ? "bg-blue-600 text-white shadow-md" : "text-slate-500 hover:bg-slate-50"
+            }`}
+          >
+            📊 ยอดอุปกรณ์ตามวันที่
+          </button>
+          <button
             onClick={() => setActiveTab("users")}
-            className={`flex-1 py-3.5 rounded-xl font-black text-xs uppercase transition-all ${
+            className={`py-3.5 px-2 rounded-xl font-black text-xs uppercase transition-all ${
               activeTab === "users" ? "bg-blue-600 text-white shadow-md" : "text-slate-500 hover:bg-slate-50"
             }`}
           >
@@ -175,18 +256,17 @@ export default function AdminSettingsPage() {
           </button>
           <button
             onClick={() => setActiveTab("history")}
-            className={`flex-1 py-3.5 rounded-xl font-black text-xs uppercase transition-all ${
+            className={`py-3.5 px-2 rounded-xl font-black text-xs uppercase transition-all ${
               activeTab === "history" ? "bg-blue-600 text-white shadow-md" : "text-slate-500 hover:bg-slate-50"
             }`}
           >
-            📅 ประวัติ & ค้นหาวัน/เดือน/ปี
+            📅 ประวัติเบิก-คืน
           </button>
         </div>
 
         {/* ==================== TAB 1: จัดการอุปกรณ์ ==================== */}
         {activeTab === "products" && (
           <div className="space-y-8">
-            {/* ฟอร์มเพิ่มอุปกรณ์ใหม่ */}
             <form onSubmit={handleAddProduct} className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm">
               <h2 className="text-sm font-black uppercase text-blue-600 mb-4">+ เพิ่มอุปกรณ์ใหม่เข้าระบบ</h2>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
@@ -229,7 +309,6 @@ export default function AdminSettingsPage() {
               </button>
             </form>
 
-            {/* ตารางแก้ไข / ลบอุปกรณ์ */}
             <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden">
               <div className="p-6 border-b border-slate-100">
                 <h2 className="text-sm font-black uppercase text-slate-800">รายการอุปกรณ์ทั้งหมด (แก้ไข / ลบ)</h2>
@@ -323,6 +402,97 @@ export default function AdminSettingsPage() {
           </div>
         )}
 
+        {/* ==================== TAB ใหม่: เช็กยอดอุปกรณ์ตาม วัน/เดือน/ปี ==================== */}
+        {activeTab === "stock_date" && (
+          <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm p-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+              <div>
+                <h2 className="text-sm font-black uppercase text-slate-800">ตรวจสอบจำนวนอุปกรณ์ตาม วัน / เดือน / ปี</h2>
+                <p className="text-[11px] font-bold text-slate-400">แสดงยอดคงเหลือ ณ สิ้นวันที่เลือก พร้อมสรุปยอดเบิก-คืนในวันนั้น</p>
+              </div>
+              <button
+                onClick={handleExportStockSnapshotCSV}
+                className="bg-emerald-600 text-white px-4 py-2.5 rounded-xl text-[10px] font-black uppercase shadow-sm hover:bg-emerald-700 active:scale-95 transition-all"
+              >
+                📥 Export CSV ({stockCheckDate})
+              </button>
+            </div>
+
+            {/* ตัวเลือกวันที่ + ค้นหา */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6 bg-blue-50/60 p-4 rounded-2xl border border-blue-100">
+              <div>
+                <label className="block text-[10px] font-black text-blue-800 uppercase mb-1">📅 เลือกวัน / เดือน / ปี</label>
+                <input
+                  type="date"
+                  value={stockCheckDate}
+                  onChange={(e) => setStockCheckDate(e.target.value)}
+                  className="w-full p-3 bg-white border border-blue-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-400"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-[10px] font-black text-slate-500 uppercase mb-1">ค้นหาชื่ออุปกรณ์ หรือ หมวดหมู่</label>
+                <input
+                  type="text"
+                  placeholder="พิมพ์ชื่ออุปกรณ์ หรือหมวดหมู่..."
+                  value={stockCheckSearch}
+                  onChange={(e) => setStockCheckSearch(e.target.value)}
+                  className="w-full p-3 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-blue-500"
+                />
+              </div>
+            </div>
+
+            {/* ตารางแสดงยอด */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-200 text-[10px] font-black uppercase text-slate-400 tracking-wider">
+                    <th className="py-3 px-3">ชื่ออุปกรณ์</th>
+                    <th className="py-3 px-3 text-center">คงเหลือ ณ วันที่เลือก</th>
+                    <th className="py-3 px-3 text-center">เบิกในวันนั้น</th>
+                    <th className="py-3 px-3 text-center">คืนในวันนั้น</th>
+                    <th className="py-3 px-3 text-center">ชำรุด</th>
+                    <th className="py-3 px-3 text-right">สต็อกปัจจุบัน</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-xs">
+                  {stockSnapshotList.map((item) => (
+                    <tr key={item.id} className="hover:bg-slate-50">
+                      <td className="py-3.5 px-3">
+                        <p className="font-black text-slate-800 uppercase">{item.name}</p>
+                        <p className="text-[10px] font-bold text-slate-400">{item.category || "ทั่วไป"}</p>
+                      </td>
+                      <td className="py-3.5 px-3 text-center">
+                        <span className="inline-block bg-blue-100 text-blue-700 font-black px-3 py-1 rounded-lg text-sm">
+                          {item.stockAtEndOfDate}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-3 text-center font-bold text-amber-600">
+                        {item.withdrawnOnDate > 0 ? `-${item.withdrawnOnDate}` : "-"}
+                      </td>
+                      <td className="py-3.5 px-3 text-center font-bold text-emerald-600">
+                        {item.returnedOnDate > 0 ? `+${item.returnedOnDate}` : "-"}
+                      </td>
+                      <td className="py-3.5 px-3 text-center font-bold text-red-500">
+                        {item.damagedOnDate > 0 ? `-${item.damagedOnDate}` : "-"}
+                      </td>
+                      <td className="py-3.5 px-3 text-right font-black text-slate-500">
+                        {item.stock} ชิ้น
+                      </td>
+                    </tr>
+                  ))}
+                  {stockSnapshotList.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="py-10 text-center text-slate-400 font-bold text-xs uppercase">
+                        ไม่พบรายการอุปกรณ์ที่ค้นหา
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
         {/* ==================== TAB 2: จัดการรายชื่อผู้ใช้ ==================== */}
         {activeTab === "users" && (
           <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm p-6">
@@ -378,7 +548,6 @@ export default function AdminSettingsPage() {
           <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm p-6">
             <h2 className="text-sm font-black uppercase text-slate-800 mb-4">ค้นหาประวัติการเบิก-คืน (รายชื่อ / วัน-เดือน-ปี)</h2>
             
-            {/* ช่องค้นหา 2 ช่องคู่กัน */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6 bg-slate-50 p-4 rounded-2xl border border-slate-200/70">
               <div className="md:col-span-2">
                 <label className="block text-[10px] font-black text-slate-500 uppercase mb-1">ค้นหาจากรายชื่อ (อีเมล) หรือชื่ออุปกรณ์</label>
